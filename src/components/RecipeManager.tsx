@@ -1,86 +1,95 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Edit, Clock, Users, ChefHat } from 'lucide-react';
-import { Recipe, RecipeIngredient } from '../types';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useRecipes } from '../hooks/useRecipes';
+import { useAuth } from '../hooks/useAuth';
 
-interface RecipeManagerProps {
-  recipes: Recipe[];
-  onAdd: (recipe: Omit<Recipe, 'id'>) => void;
-  onUpdate: (id: string, recipe: Partial<Recipe>) => void;
-  onDelete: (id: string) => void;
-}
-
-export const RecipeManager: React.FC<RecipeManagerProps> = ({
-  recipes,
-  onAdd,
-  onUpdate,
-  onDelete,
-}) => {
-  const { t } = useLanguage();
+export const RecipeManager: React.FC = () => {
+  const { user } = useAuth();
+  const { recipes, loading, error, addRecipe, updateRecipe, deleteRecipe } = useRecipes(user?.id);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    nameId: '',
     description: '',
-    descriptionId: '',
-    ingredients: [] as RecipeIngredient[],
+    ingredients: [] as Array<{ name: string; quantity: number; unit: string }>,
     instructions: [''],
-    instructionsId: [''],
-    prepTime: 10,
-    cookTime: 20,
+    prep_time: 10,
+    cook_time: 20,
     servings: 4,
     difficulty: 'easy' as const,
     tags: [] as string[],
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const difficultyTranslations = {
+    easy: 'Mudah',
+    medium: 'Sedang',
+    hard: 'Sulit',
+  };
+
+  const unitTranslations: Record<string, string> = {
+    kg: 'kg',
+    gram: 'gram',
+    liter: 'liter',
+    ml: 'ml',
+    piece: 'buah',
+    clove: 'siung',
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const recipeData = {
-      ...formData,
-      nameId: formData.name,
-      descriptionId: formData.description,
-      instructionsId: formData.instructions,
-    };
-    
-    if (editingId) {
-      onUpdate(editingId, recipeData);
-      setEditingId(null);
-    } else {
-      onAdd(recipeData);
+    try {
+      const recipeData = {
+        name: formData.name,
+        description: formData.description,
+        instructions: formData.instructions.filter(inst => inst.trim() !== ''),
+        prep_time: formData.prep_time,
+        cook_time: formData.cook_time,
+        servings: formData.servings,
+        difficulty: formData.difficulty,
+        tags: formData.tags,
+      };
+
+      const ingredients = formData.ingredients.filter(ing => ing.name.trim() !== '');
+
+      if (editingId) {
+        await updateRecipe(editingId, recipeData, ingredients);
+        setEditingId(null);
+      } else {
+        await addRecipe(recipeData, ingredients);
+      }
+      resetForm();
+      setShowForm(false);
+    } catch (err) {
+      console.error('Error saving recipe:', err);
     }
-    resetForm();
-    setShowForm(false);
   };
 
   const resetForm = () => {
     setFormData({
       name: '',
-      nameId: '',
       description: '',
-      descriptionId: '',
       ingredients: [],
       instructions: [''],
-      instructionsId: [''],
-      prepTime: 10,
-      cookTime: 20,
+      prep_time: 10,
+      cook_time: 20,
       servings: 4,
       difficulty: 'easy',
       tags: [],
     });
   };
 
-  const handleEdit = (recipe: Recipe) => {
+  const handleEdit = (recipe: any) => {
     setFormData({
       name: recipe.name,
-      nameId: recipe.nameId,
       description: recipe.description,
-      descriptionId: recipe.descriptionId,
-      ingredients: recipe.ingredients,
-      instructions: recipe.instructions,
-      instructionsId: recipe.instructionsId,
-      prepTime: recipe.prepTime,
-      cookTime: recipe.cookTime,
+      ingredients: recipe.recipe_ingredients.map((ing: any) => ({
+        name: ing.name,
+        quantity: ing.quantity,
+        unit: ing.unit,
+      })),
+      instructions: recipe.instructions.length > 0 ? recipe.instructions : [''],
+      prep_time: recipe.prep_time,
+      cook_time: recipe.cook_time,
       servings: recipe.servings,
       difficulty: recipe.difficulty,
       tags: recipe.tags,
@@ -89,11 +98,20 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
     setShowForm(true);
   };
 
+  const handleDelete = async (id: string) => {
+    if (confirm('Apakah Anda yakin ingin menghapus resep ini?')) {
+      try {
+        await deleteRecipe(id);
+      } catch (err) {
+        console.error('Error deleting recipe:', err);
+      }
+    }
+  };
+
   const addInstruction = () => {
     setFormData({
       ...formData,
       instructions: [...formData.instructions, ''],
-      instructionsId: [...formData.instructionsId, ''],
     });
   };
 
@@ -107,7 +125,6 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
     setFormData({
       ...formData,
       instructions: formData.instructions.filter((_, i) => i !== index),
-      instructionsId: formData.instructionsId.filter((_, i) => i !== index),
     });
   };
 
@@ -116,17 +133,14 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
       ...formData,
       ingredients: [
         ...formData.ingredients,
-        { ingredientId: '', name: '', nameId: '', quantity: 1, unit: 'piece' },
+        { name: '', quantity: 1, unit: 'piece' },
       ],
     });
   };
 
-  const updateIngredient = (index: number, field: keyof RecipeIngredient, value: any) => {
+  const updateIngredient = (index: number, field: string, value: any) => {
     const newIngredients = [...formData.ingredients];
     newIngredients[index] = { ...newIngredients[index], [field]: value };
-    if (field === 'name') {
-      newIngredients[index].nameId = value; // Keep same name for both fields
-    }
     setFormData({ ...formData, ingredients: newIngredients });
   };
 
@@ -137,28 +151,44 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
     });
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600">Error: {error}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">{t('myRecipes')}</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Resep-Resep Saya</h2>
         <button
           onClick={() => setShowForm(true)}
           className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
         >
           <Plus size={18} />
-          {t('addRecipe')}
+          Tambah Resep
         </button>
       </div>
 
       {showForm && (
         <div className="bg-white p-6 rounded-lg shadow-md border border-green-100 max-h-96 overflow-y-auto">
           <h3 className="text-lg font-semibold mb-4">
-            {editingId ? t('edit') : t('add')} {t('recipes')}
+            {editingId ? 'Edit' : 'Tambah'} Resep
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('recipeName')}
+                Nama Resep
               </label>
               <input
                 type="text"
@@ -172,7 +202,7 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('description')}
+                Deskripsi
               </label>
               <textarea
                 value={formData.description}
@@ -186,31 +216,31 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('prepTime')}
+                  Waktu Persiapan (menit)
                 </label>
                 <input
                   type="number"
-                  value={formData.prepTime}
-                  onChange={(e) => setFormData({ ...formData, prepTime: Number(e.target.value) })}
+                  value={formData.prep_time}
+                  onChange={(e) => setFormData({ ...formData, prep_time: Number(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   min="1"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('cookTime')}
+                  Waktu Memasak (menit)
                 </label>
                 <input
                   type="number"
-                  value={formData.cookTime}
-                  onChange={(e) => setFormData({ ...formData, cookTime: Number(e.target.value) })}
+                  value={formData.cook_time}
+                  onChange={(e) => setFormData({ ...formData, cook_time: Number(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   min="1"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('servings')}
+                  Porsi
                 </label>
                 <input
                   type="number"
@@ -222,16 +252,16 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('difficulty')}
+                  Tingkat Kesulitan
                 </label>
                 <select
                   value={formData.difficulty}
                   onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 >
-                  <option value="easy">{t('easy')}</option>
-                  <option value="medium">{t('medium')}</option>
-                  <option value="hard">{t('hard')}</option>
+                  <option value="easy">Mudah</option>
+                  <option value="medium">Sedang</option>
+                  <option value="hard">Sulit</option>
                 </select>
               </div>
             </div>
@@ -293,7 +323,7 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-medium text-gray-700">
-                  {t('instructions')}
+                  Cara Memasak
                 </label>
                 <button
                   type="button"
@@ -331,7 +361,7 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
                 type="submit"
                 className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
               >
-                {t('save')}
+                Simpan
               </button>
               <button
                 type="button"
@@ -342,7 +372,7 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
                 }}
                 className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
               >
-                {t('cancel')}
+                Batal
               </button>
             </div>
           </form>
@@ -352,7 +382,7 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
       {recipes.length === 0 ? (
         <div className="text-center py-12">
           <ChefHat size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">{t('noRecipes')}</p>
+          <p className="text-gray-500">Belum ada resep tersimpan. Buat resep pertama Anda!</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -372,7 +402,7 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
                       <Edit size={14} />
                     </button>
                     <button
-                      onClick={() => onDelete(recipe.id)}
+                      onClick={() => handleDelete(recipe.id)}
                       className="p-1 text-red-600 hover:bg-red-100 rounded"
                     >
                       <Trash2 size={14} />
@@ -385,7 +415,7 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
                   <div className="flex items-center gap-1">
                     <Clock size={14} />
-                    <span>{recipe.prepTime + recipe.cookTime} menit</span>
+                    <span>{recipe.prep_time + recipe.cook_time} menit</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Users size={14} />
@@ -396,13 +426,13 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
                     recipe.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
                     'bg-red-100 text-red-800'
                   }`}>
-                    {t(recipe.difficulty)}
+                    {difficultyTranslations[recipe.difficulty]}
                   </span>
                 </div>
                 
                 <div className="text-sm text-gray-600">
                   <span className="font-medium">Bahan: </span>
-                  {recipe.ingredients.length} item
+                  {recipe.recipe_ingredients.length} item
                 </div>
               </div>
             </div>

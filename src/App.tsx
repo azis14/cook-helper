@@ -5,107 +5,66 @@ import { IngredientManager } from './components/IngredientManager';
 import { RecipeManager } from './components/RecipeManager';
 import { RecipeSuggestions } from './components/RecipeSuggestions';
 import { WeeklyPlanner } from './components/WeeklyPlanner';
-import { LanguageProvider } from './contexts/LanguageContext';
-import { useLocalStorage } from './hooks/useLocalStorage';
-import { Ingredient, Recipe, WeeklyPlan } from './types';
+import { AuthForm } from './components/AuthForm';
+import { useAuth } from './hooks/useAuth';
+import { signOut } from './lib/supabase';
+import { LogOut } from 'lucide-react';
 
 function App() {
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('ingredients');
-  const [ingredients, setIngredients] = useLocalStorage<Ingredient[]>('ingredients', []);
-  const [recipes, setRecipes] = useLocalStorage<Recipe[]>('recipes', []);
-  const [weeklyPlan, setWeeklyPlan] = useLocalStorage<WeeklyPlan | null>('weeklyPlan', null);
 
-  const addIngredient = (ingredient: Omit<Ingredient, 'id'>) => {
-    const newIngredient = {
-      ...ingredient,
-      id: 'ingredient-' + Date.now() + Math.random(),
-    };
-    setIngredients([...ingredients, newIngredient]);
-  };
-
-  const updateIngredient = (id: string, updates: Partial<Ingredient>) => {
-    setIngredients(ingredients.map(ing => 
-      ing.id === id ? { ...ing, ...updates } : ing
-    ));
-  };
-
-  const deleteIngredient = (id: string) => {
-    setIngredients(ingredients.filter(ing => ing.id !== id));
-  };
-
-  const addRecipe = (recipe: Omit<Recipe, 'id'>) => {
-    const newRecipe = {
-      ...recipe,
-      id: 'recipe-' + Date.now() + Math.random(),
-    };
-    setRecipes([...recipes, newRecipe]);
-  };
-
-  const updateRecipe = (id: string, updates: Partial<Recipe>) => {
-    setRecipes(recipes.map(recipe => 
-      recipe.id === id ? { ...recipe, ...updates } : recipe
-    ));
-  };
-
-  const deleteRecipe = (id: string) => {
-    setRecipes(recipes.filter(recipe => recipe.id !== id));
-  };
-
-  const updateWeeklyPlan = (plan: WeeklyPlan) => {
-    setWeeklyPlan(plan);
+  const handleSignOut = async () => {
+    await signOut();
   };
 
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'ingredients':
-        return (
-          <IngredientManager
-            ingredients={ingredients}
-            onAdd={addIngredient}
-            onUpdate={updateIngredient}
-            onDelete={deleteIngredient}
-          />
-        );
+        return <IngredientManager />;
       case 'recipes':
-        return (
-          <RecipeManager
-            recipes={recipes}
-            onAdd={addRecipe}
-            onUpdate={updateRecipe}
-            onDelete={deleteRecipe}
-          />
-        );
+        return <RecipeManager />;
       case 'suggestions':
-        return (
-          <RecipeSuggestions
-            ingredients={ingredients}
-            recipes={recipes}
-          />
-        );
+        return <RecipeSuggestions />;
       case 'weekly-plan':
-        return (
-          <WeeklyPlanner
-            recipes={recipes}
-            ingredients={ingredients}
-            weeklyPlan={weeklyPlan}
-            onUpdatePlan={updateWeeklyPlan}
-          />
-        );
+        return <WeeklyPlanner />;
       default:
         return null;
     }
   };
 
-  return (
-    <LanguageProvider>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50">
-        <Header />
-        <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {renderActiveTab()}
-        </main>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
       </div>
-    </LanguageProvider>
+    );
+  }
+
+  if (!user) {
+    return <AuthForm onSuccess={() => {}} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50">
+      <Header />
+      <div className="flex items-center justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+        <div className="text-sm text-gray-600">
+          Selamat datang, {user.email}
+        </div>
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
+        >
+          <LogOut size={16} />
+          Keluar
+        </button>
+      </div>
+      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderActiveTab()}
+      </main>
+    </div>
   );
 }
 
