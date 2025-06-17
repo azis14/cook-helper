@@ -1,0 +1,27 @@
+import React from 'react';
+import { ChefHat } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
+import { LanguageToggle } from './LanguageToggle';
+
+export const Header: React.FC = () => {
+  const { t } = useLanguage();
+
+  return (
+    <header className="bg-gradient-to-r from-orange-200 to-yellow-200 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-300 rounded-lg">
+              <ChefHat className="text-orange-800" size={24} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-orange-900">{t('appTitle')}</h1>
+              <p className="text-sm text-orange-700">{t('appSubtitle')}</p>
+            </div>
+          </div>
+          <LanguageToggle />
+        </div>
+      </div>
+    </header>
+  );
+};
