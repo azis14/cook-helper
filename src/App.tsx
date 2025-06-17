@@ -6,13 +6,16 @@ import { RecipeManager } from './components/RecipeManager';
 import { RecipeSuggestions } from './components/RecipeSuggestions';
 import { WeeklyPlanner } from './components/WeeklyPlanner';
 import { AuthForm } from './components/AuthForm';
-import { LanguageProvider } from './contexts/LanguageContext';
 import { useAuth } from './hooks/useAuth';
+import { useIngredients } from './hooks/useIngredients';
+import { useRecipes } from './hooks/useRecipes';
 import { signOut } from './lib/supabase';
 import { LogOut } from 'lucide-react';
 
 function App() {
   const { user, loading } = useAuth();
+  const { ingredients } = useIngredients(user?.id);
+  const { recipes } = useRecipes(user?.id);
   const [activeTab, setActiveTab] = useState('ingredients');
 
   const handleSignOut = async () => {
@@ -26,9 +29,9 @@ function App() {
       case 'recipes':
         return <RecipeManager />;
       case 'suggestions':
-        return <RecipeSuggestions />;
+        return <RecipeSuggestions ingredients={ingredients} recipes={recipes} />;
       case 'weekly-plan':
-        return <WeeklyPlanner />;
+        return <WeeklyPlanner ingredients={ingredients} recipes={recipes} />;
       default:
         return null;
     }
@@ -47,27 +50,25 @@ function App() {
   }
 
   return (
-    <LanguageProvider>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50">
-        <Header />
-        <div className="flex items-center justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <div className="text-sm text-gray-600">
-            Selamat datang, {user.email}
-          </div>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
-          >
-            <LogOut size={16} />
-            Keluar
-          </button>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50">
+      <Header />
+      <div className="flex items-center justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+        <div className="text-sm text-gray-600">
+          Selamat datang, {user.email}
         </div>
-        <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {renderActiveTab()}
-        </main>
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
+        >
+          <LogOut size={16} />
+          Keluar
+        </button>
       </div>
-    </LanguageProvider>
+      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderActiveTab()}
+      </main>
+    </div>
   );
 }
 

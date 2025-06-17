@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Lightbulb, RefreshCw, Clock, Users, ChefHat } from 'lucide-react';
 import { Recipe, Ingredient } from '../types';
-import { useLanguage } from '../contexts/LanguageContext';
 
 interface RecipeSuggestionsProps {
   ingredients: Ingredient[];
@@ -12,9 +11,25 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
   ingredients,
   recipes,
 }) => {
-  const { t } = useLanguage();
   const [suggestions, setSuggestions] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const difficultyTranslations = {
+    easy: 'Mudah',
+    medium: 'Sedang',
+    hard: 'Sulit',
+  };
+
+  const unitTranslations: Record<string, string> = {
+    kg: 'kg',
+    gram: 'gram',
+    liter: 'liter',
+    ml: 'ml',
+    piece: 'buah',
+    clove: 'siung',
+    piring: 'piring',
+    butir: 'butir',
+  };
 
   // Mock AI suggestions based on available ingredients
   const generateSuggestions = () => {
@@ -101,8 +116,8 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">{t('recipeSuggestions')}</h2>
-          <p className="text-gray-600 mt-1">{t('basedOnIngredients')}</p>
+          <h2 className="text-2xl font-bold text-gray-900">Saran Resep</h2>
+          <p className="text-gray-600 mt-1">Berdasarkan bahan yang tersedia</p>
         </div>
         <button
           onClick={generateSuggestions}
@@ -110,7 +125,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
           className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-          {t('generateSuggestions')}
+          Buat Saran Resep
         </button>
       </div>
 
@@ -161,7 +176,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                     recipe.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
                     'bg-red-100 text-red-800'
                   }`}>
-                    {t(recipe.difficulty)}
+                    {difficultyTranslations[recipe.difficulty]}
                   </span>
                 </div>
                 
@@ -170,7 +185,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                   <ul className="text-sm text-gray-600 space-y-1">
                     {(recipe.recipe_ingredients || []).slice(0, 3).map((ingredient, index) => (
                       <li key={index}>
-                        • {ingredient.quantity} {t(ingredient.unit)} {ingredient.name}
+                        • {ingredient.quantity} {unitTranslations[ingredient.unit] || ingredient.unit} {ingredient.name}
                       </li>
                     ))}
                     {(recipe.recipe_ingredients || []).length > 3 && (

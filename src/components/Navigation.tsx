@@ -1,6 +1,5 @@
 import React from 'react';
 import { Package, BookOpen, Lightbulb, Calendar } from 'lucide-react';
-import { useLanguage } from '../contexts/LanguageContext';
 
 interface NavigationProps {
   activeTab: string;
@@ -8,13 +7,11 @@ interface NavigationProps {
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
-  const { t } = useLanguage();
-
   const tabs = [
-    { id: 'ingredients', label: t('ingredients'), icon: Package },
-    { id: 'recipes', label: t('recipes'), icon: BookOpen },
-    { id: 'suggestions', label: t('suggestions'), icon: Lightbulb },
-    { id: 'weekly-plan', label: t('weeklyPlan'), icon: Calendar },
+    { id: 'ingredients', label: 'Bahan', icon: Package },
+    { id: 'recipes', label: 'Resep', icon: BookOpen },
+    { id: 'suggestions', label: 'Saran', icon: Lightbulb },
+    { id: 'weekly-plan', label: 'Rencana Mingguan', icon: Calendar },
   ];
 
   return (

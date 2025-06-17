@@ -1,27 +1,27 @@
 import React, { useState } from 'react';
 import { Calendar, ShoppingCart, Clock, Users } from 'lucide-react';
 import { Recipe, WeeklyPlan, DailyMeals, ShoppingItem, Ingredient } from '../types';
-import { useLanguage } from '../contexts/LanguageContext';
 
 interface WeeklyPlannerProps {
   recipes: Recipe[];
   ingredients: Ingredient[];
-  weeklyPlan: WeeklyPlan | null;
-  onUpdatePlan: (plan: WeeklyPlan) => void;
 }
 
 export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
   recipes,
   ingredients,
-  weeklyPlan,
-  onUpdatePlan,
 }) => {
-  const { t } = useLanguage();
+  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
 
-  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
   const meals = ['breakfast', 'lunch', 'dinner'];
+  const mealLabels = {
+    breakfast: 'Sarapan',
+    lunch: 'Makan Siang',
+    dinner: 'Makan Malam',
+  };
 
   const generateWeeklyPlan = () => {
     setIsGenerating(true);
@@ -62,7 +62,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
         daily_meals: dailyMeals,
       };
       
-      onUpdatePlan(newPlan);
+      setWeeklyPlan(newPlan);
       generateShoppingList(newPlan);
       setIsGenerating(false);
     }, 2000);
@@ -127,15 +127,26 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
       daily_meals: updatedMeals,
     };
     
-    onUpdatePlan(updatedPlan);
+    setWeeklyPlan(updatedPlan);
     generateShoppingList(updatedPlan);
+  };
+
+  const unitTranslations: Record<string, string> = {
+    kg: 'kg',
+    gram: 'gram',
+    liter: 'liter',
+    ml: 'ml',
+    piece: 'buah',
+    clove: 'siung',
+    piring: 'piring',
+    butir: 'butir',
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">{t('myWeeklyPlan')}</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Rencana Menu Mingguan</h2>
           <p className="text-gray-600 mt-1">Rencanakan menu makan untuk seminggu dengan efisien</p>
         </div>
         <button
@@ -144,7 +155,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
           className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           <Calendar size={18} />
-          {isGenerating ? 'Sedang membuat...' : t('generatePlan')}
+          {isGenerating ? 'Sedang membuat...' : 'Buat Rencana Menu'}
         </button>
       </div>
 
@@ -161,13 +172,13 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
             {weeklyPlan.daily_meals.map((day, dayIndex) => (
               <div key={dayIndex} className="bg-white rounded-lg shadow-md border border-blue-100 p-4">
                 <h3 className="font-semibold text-gray-900 mb-3 text-center">
-                  {t(days[dayIndex])}
+                  {days[dayIndex]}
                 </h3>
                 <div className="space-y-3">
                   {meals.map((mealType) => (
                     <div key={mealType} className="border border-gray-200 rounded-lg p-2">
                       <div className="text-xs font-medium text-gray-600 mb-1">
-                        {t(mealType)}
+                        {mealLabels[mealType as keyof typeof mealLabels]}
                       </div>
                       {day[mealType as keyof DailyMeals] ? (
                         <div className="text-sm">
@@ -221,7 +232,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
             <div className="bg-white rounded-lg shadow-md border border-green-100 p-6">
               <div className="flex items-center gap-2 mb-4">
                 <ShoppingCart className="text-green-600" size={24} />
-                <h3 className="text-lg font-semibold text-gray-900">{t('shoppingList')}</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Daftar Belanja</h3>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -234,7 +245,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
                           {item.name}
                         </span>
                         <span className="text-gray-500 ml-2">
-                          {item.quantity} {t(item.unit)}
+                          {item.quantity} {unitTranslations[item.unit] || item.unit}
                         </span>
                       </li>
                     ))}
