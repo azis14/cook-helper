@@ -36,11 +36,18 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const recipeData = {
+      ...formData,
+      nameId: formData.name,
+      descriptionId: formData.description,
+      instructionsId: formData.instructions,
+    };
+    
     if (editingId) {
-      onUpdate(editingId, formData);
+      onUpdate(editingId, recipeData);
       setEditingId(null);
     } else {
-      onAdd(formData);
+      onAdd(recipeData);
     }
     resetForm();
     setShowForm(false);
@@ -90,16 +97,10 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
     });
   };
 
-  const updateInstruction = (index: number, value: string, lang: 'en' | 'id') => {
-    if (lang === 'en') {
-      const newInstructions = [...formData.instructions];
-      newInstructions[index] = value;
-      setFormData({ ...formData, instructions: newInstructions });
-    } else {
-      const newInstructionsId = [...formData.instructionsId];
-      newInstructionsId[index] = value;
-      setFormData({ ...formData, instructionsId: newInstructionsId });
-    }
+  const updateInstruction = (index: number, value: string) => {
+    const newInstructions = [...formData.instructions];
+    newInstructions[index] = value;
+    setFormData({ ...formData, instructions: newInstructions });
   };
 
   const removeInstruction = (index: number) => {
@@ -123,6 +124,9 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
   const updateIngredient = (index: number, field: keyof RecipeIngredient, value: any) => {
     const newIngredients = [...formData.ingredients];
     newIngredients[index] = { ...newIngredients[index], [field]: value };
+    if (field === 'name') {
+      newIngredients[index].nameId = value; // Keep same name for both fields
+    }
     setFormData({ ...formData, ingredients: newIngredients });
   };
 
@@ -152,56 +156,31 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
             {editingId ? t('edit') : t('add')} {t('recipes')}
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('recipeName')} (English)
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('recipeName')} (Indonesia)
-                </label>
-                <input
-                  type="text"
-                  value={formData.nameId}
-                  onChange={(e) => setFormData({ ...formData, nameId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  required
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t('recipeName')}
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder="contoh: Nasi Goreng Spesial"
+                required
+              />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('description')} (English)
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  rows={3}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {t('description')} (Indonesia)
-                </label>
-                <textarea
-                  value={formData.descriptionId}
-                  onChange={(e) => setFormData({ ...formData, descriptionId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  rows={3}
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t('description')}
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                rows={3}
+                placeholder="Deskripsi singkat tentang resep ini..."
+              />
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -255,6 +234,96 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
                   <option value="hard">{t('hard')}</option>
                 </select>
               </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Bahan-bahan
+                </label>
+                <button
+                  type="button"
+                  onClick={addIngredient}
+                  className="text-sm text-green-600 hover:text-green-800"
+                >
+                  + Tambah Bahan
+                </button>
+              </div>
+              {formData.ingredients.map((ingredient, index) => (
+                <div key={index} className="grid grid-cols-12 gap-2 mb-2">
+                  <input
+                    type="text"
+                    placeholder="Nama bahan"
+                    value={ingredient.name}
+                    onChange={(e) => updateIngredient(index, 'name', e.target.value)}
+                    className="col-span-5 px-2 py-1 border border-gray-300 rounded text-sm"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Jumlah"
+                    value={ingredient.quantity}
+                    onChange={(e) => updateIngredient(index, 'quantity', Number(e.target.value))}
+                    className="col-span-2 px-2 py-1 border border-gray-300 rounded text-sm"
+                    min="0.1"
+                    step="0.1"
+                  />
+                  <select
+                    value={ingredient.unit}
+                    onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
+                    className="col-span-3 px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="kg">kg</option>
+                    <option value="gram">gram</option>
+                    <option value="liter">liter</option>
+                    <option value="ml">ml</option>
+                    <option value="piece">buah</option>
+                    <option value="clove">siung</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeIngredient(index)}
+                    className="col-span-2 text-red-600 hover:text-red-800 text-sm"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  {t('instructions')}
+                </label>
+                <button
+                  type="button"
+                  onClick={addInstruction}
+                  className="text-sm text-green-600 hover:text-green-800"
+                >
+                  + Tambah Langkah
+                </button>
+              </div>
+              {formData.instructions.map((instruction, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <span className="text-sm text-gray-500 mt-2">{index + 1}.</span>
+                  <textarea
+                    value={instruction}
+                    onChange={(e) => updateInstruction(index, e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    rows={2}
+                    placeholder={`Langkah ${index + 1}...`}
+                  />
+                  {formData.instructions.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeInstruction(index)}
+                      className="text-red-600 hover:text-red-800 text-sm"
+                    >
+                      Hapus
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
 
             <div className="flex gap-2">
@@ -316,11 +385,11 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
                   <div className="flex items-center gap-1">
                     <Clock size={14} />
-                    <span>{recipe.prepTime + recipe.cookTime}m</span>
+                    <span>{recipe.prepTime + recipe.cookTime} menit</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Users size={14} />
-                    <span>{recipe.servings}</span>
+                    <span>{recipe.servings} porsi</span>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-xs ${
                     recipe.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
@@ -332,8 +401,8 @@ export const RecipeManager: React.FC<RecipeManagerProps> = ({
                 </div>
                 
                 <div className="text-sm text-gray-600">
-                  <span className="font-medium">{t('ingredients')}: </span>
-                  {recipe.ingredients.length} items
+                  <span className="font-medium">Bahan: </span>
+                  {recipe.ingredients.length} item
                 </div>
               </div>
             </div>

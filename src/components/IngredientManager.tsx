@@ -31,44 +31,11 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
   const categories = ['vegetables', 'meat', 'dairy', 'grains', 'spices', 'fruits', 'seafood'];
   const units = ['kg', 'gram', 'liter', 'ml', 'piece', 'clove'];
 
-  // Simple ingredient name mapping for common ingredients
-  const getIndonesianName = (englishName: string): string => {
-    const commonTranslations: Record<string, string> = {
-      'chicken': 'ayam',
-      'beef': 'daging sapi',
-      'rice': 'beras',
-      'egg': 'telur',
-      'onion': 'bawang merah',
-      'garlic': 'bawang putih',
-      'tomato': 'tomat',
-      'potato': 'kentang',
-      'carrot': 'wortel',
-      'cabbage': 'kubis',
-      'spinach': 'bayam',
-      'milk': 'susu',
-      'cheese': 'keju',
-      'butter': 'mentega',
-      'oil': 'minyak',
-      'salt': 'garam',
-      'sugar': 'gula',
-      'pepper': 'merica',
-      'chili': 'cabai',
-      'ginger': 'jahe',
-      'lemon': 'jeruk nipis',
-      'banana': 'pisang',
-      'apple': 'apel',
-      'fish': 'ikan',
-      'shrimp': 'udang',
-    };
-    
-    return commonTranslations[englishName.toLowerCase()] || englishName;
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const ingredientData = {
       ...formData,
-      nameId: formData.nameId || getIndonesianName(formData.name),
+      nameId: formData.name, // Use same name for both fields
     };
     
     if (editingId) {
@@ -137,12 +104,9 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                placeholder="e.g., Chicken, Tomato, Rice..."
+                placeholder="contoh: Ayam, Tomat, Beras..."
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Enter the ingredient name in English (Indonesian translation will be added automatically)
-              </p>
             </div>
             
             <div>
@@ -264,13 +228,12 @@ export const IngredientManager: React.FC<IngredientManagerProps> = ({
                         </button>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-600 mb-1">{ingredient.nameId}</p>
                     <p className="text-sm text-gray-700">
                       {ingredient.quantity} {t(ingredient.unit)}
                     </p>
                     {ingredient.expiryDate && (
                       <p className="text-xs text-orange-600 mt-1">
-                        Exp: {new Date(ingredient.expiryDate).toLocaleDateString()}
+                        Kadaluarsa: {new Date(ingredient.expiryDate).toLocaleDateString('id-ID')}
                       </p>
                     )}
                   </div>

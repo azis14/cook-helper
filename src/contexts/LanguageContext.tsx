@@ -1,111 +1,106 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Language } from '../types';
+import React, { createContext, useContext, ReactNode } from 'react';
 
 interface LanguageContextType {
-  language: Language;
-  setLanguage: (lang: Language) => void;
   t: (key: string) => string;
 }
 
 const translations = {
   // Navigation
-  ingredients: { en: 'Ingredients', id: 'Bahan' },
-  recipes: { en: 'Recipes', id: 'Resep' },
-  suggestions: { en: 'Suggestions', id: 'Saran' },
-  weeklyPlan: { en: 'Weekly Plan', id: 'Rencana Mingguan' },
+  ingredients: 'Bahan',
+  recipes: 'Resep',
+  suggestions: 'Saran',
+  weeklyPlan: 'Rencana Mingguan',
   
   // Common
-  add: { en: 'Add', id: 'Tambah' },
-  edit: { en: 'Edit', id: 'Edit' },
-  delete: { en: 'Delete', id: 'Hapus' },
-  save: { en: 'Save', id: 'Simpan' },
-  cancel: { en: 'Cancel', id: 'Batal' },
-  search: { en: 'Search', id: 'Cari' },
-  name: { en: 'Name', id: 'Nama' },
-  quantity: { en: 'Quantity', id: 'Jumlah' },
-  unit: { en: 'Unit', id: 'Satuan' },
-  category: { en: 'Category', id: 'Kategori' },
-  optional: { en: 'optional', id: 'opsional' },
+  add: 'Tambah',
+  edit: 'Edit',
+  delete: 'Hapus',
+  save: 'Simpan',
+  cancel: 'Batal',
+  search: 'Cari',
+  name: 'Nama',
+  quantity: 'Jumlah',
+  unit: 'Satuan',
+  category: 'Kategori',
+  optional: 'opsional',
   
   // Ingredients
-  myIngredients: { en: 'My Ingredients', id: 'Bahan Saya' },
-  addIngredient: { en: 'Add Ingredient', id: 'Tambah Bahan' },
-  ingredientName: { en: 'Ingredient Name', id: 'Nama Bahan' },
-  expiryDate: { en: 'Expiry Date', id: 'Tanggal Kadaluarsa' },
+  myIngredients: 'Bahan-Bahan Saya',
+  addIngredient: 'Tambah Bahan',
+  ingredientName: 'Nama Bahan',
+  expiryDate: 'Tanggal Kadaluarsa',
   
   // Categories
-  vegetables: { en: 'Vegetables', id: 'Sayuran' },
-  meat: { en: 'Meat', id: 'Daging' },
-  dairy: { en: 'Dairy', id: 'Susu' },
-  grains: { en: 'Grains', id: 'Biji-bijian' },
-  spices: { en: 'Spices', id: 'Rempah' },
-  fruits: { en: 'Fruits', id: 'Buah' },
-  seafood: { en: 'Seafood', id: 'Makanan Laut' },
+  vegetables: 'Sayuran',
+  meat: 'Daging',
+  dairy: 'Susu & Olahan',
+  grains: 'Biji-bijian',
+  spices: 'Rempah-rempah',
+  fruits: 'Buah-buahan',
+  seafood: 'Makanan Laut',
   
   // Units
-  kg: { en: 'kg', id: 'kg' },
-  gram: { en: 'gram', id: 'gram' },
-  liter: { en: 'liter', id: 'liter' },
-  ml: { en: 'ml', id: 'ml' },
-  piece: { en: 'piece', id: 'buah' },
-  clove: { en: 'clove', id: 'siung' },
+  kg: 'kg',
+  gram: 'gram',
+  liter: 'liter',
+  ml: 'ml',
+  piece: 'buah',
+  clove: 'siung',
   
   // Recipes
-  myRecipes: { en: 'My Recipes', id: 'Resep Saya' },
-  addRecipe: { en: 'Add Recipe', id: 'Tambah Resep' },
-  recipeName: { en: 'Recipe Name', id: 'Nama Resep' },
-  description: { en: 'Description', id: 'Deskripsi' },
-  instructions: { en: 'Instructions', id: 'Petunjuk' },
-  prepTime: { en: 'Prep Time (min)', id: 'Waktu Persiapan (menit)' },
-  cookTime: { en: 'Cook Time (min)', id: 'Waktu Memasak (menit)' },
-  servings: { en: 'Servings', id: 'Porsi' },
-  difficulty: { en: 'Difficulty', id: 'Tingkat Kesulitan' },
-  easy: { en: 'Easy', id: 'Mudah' },
-  medium: { en: 'Medium', id: 'Sedang' },
-  hard: { en: 'Hard', id: 'Sulit' },
+  myRecipes: 'Resep-Resep Saya',
+  addRecipe: 'Tambah Resep',
+  recipeName: 'Nama Resep',
+  description: 'Deskripsi',
+  instructions: 'Cara Memasak',
+  prepTime: 'Waktu Persiapan (menit)',
+  cookTime: 'Waktu Memasak (menit)',
+  servings: 'Porsi',
+  difficulty: 'Tingkat Kesulitan',
+  easy: 'Mudah',
+  medium: 'Sedang',
+  hard: 'Sulit',
   
   // Recipe Suggestions
-  recipeSuggestions: { en: 'Recipe Suggestions', id: 'Saran Resep' },
-  basedOnIngredients: { en: 'Based on your available ingredients', id: 'Berdasarkan bahan yang tersedia' },
-  generateSuggestions: { en: 'Generate Suggestions', id: 'Buat Saran' },
+  recipeSuggestions: 'Saran Resep',
+  basedOnIngredients: 'Berdasarkan bahan yang tersedia',
+  generateSuggestions: 'Buat Saran Resep',
   
   // Weekly Plan
-  myWeeklyPlan: { en: 'My Weekly Plan', id: 'Rencana Mingguan Saya' },
-  generatePlan: { en: 'Generate Plan', id: 'Buat Rencana' },
-  shoppingList: { en: 'Shopping List', id: 'Daftar Belanja' },
-  breakfast: { en: 'Breakfast', id: 'Sarapan' },
-  lunch: { en: 'Lunch', id: 'Makan Siang' },
-  dinner: { en: 'Dinner', id: 'Makan Malam' },
+  myWeeklyPlan: 'Rencana Menu Mingguan',
+  generatePlan: 'Buat Rencana Menu',
+  shoppingList: 'Daftar Belanja',
+  breakfast: 'Sarapan',
+  lunch: 'Makan Siang',
+  dinner: 'Makan Malam',
   
   // Days
-  monday: { en: 'Monday', id: 'Senin' },
-  tuesday: { en: 'Tuesday', id: 'Selasa' },
-  wednesday: { en: 'Wednesday', id: 'Rabu' },
-  thursday: { en: 'Thursday', id: 'Kamis' },
-  friday: { en: 'Friday', id: 'Jumat' },
-  saturday: { en: 'Saturday', id: 'Sabtu' },
-  sunday: { en: 'Sunday', id: 'Minggu' },
+  monday: 'Senin',
+  tuesday: 'Selasa',
+  wednesday: 'Rabu',
+  thursday: 'Kamis',
+  friday: 'Jumat',
+  saturday: 'Sabtu',
+  sunday: 'Minggu',
   
   // Messages
-  noIngredients: { en: 'No ingredients added yet. Start by adding some ingredients!', id: 'Belum ada bahan. Mulai dengan menambahkan beberapa bahan!' },
-  noRecipes: { en: 'No recipes saved yet. Create your first recipe!', id: 'Belum ada resep tersimpan. Buat resep pertama Anda!' },
+  noIngredients: 'Belum ada bahan yang ditambahkan. Mulai dengan menambahkan beberapa bahan!',
+  noRecipes: 'Belum ada resep tersimpan. Buat resep pertama Anda!',
   
   // App Title
-  appTitle: { en: 'Kitchen Helper', id: 'Asisten Dapur' },
-  appSubtitle: { en: 'Your AI-powered cooking companion', id: 'Pendamping memasak bertenaga AI Anda' },
+  appTitle: 'Asisten Dapur',
+  appSubtitle: 'Pendamping memasak pintar untuk keluarga Indonesia',
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>('en');
-
   const t = (key: string): string => {
-    return translations[key as keyof typeof translations]?.[language] || key;
+    return translations[key as keyof typeof translations] || key;
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ t }}>
       {children}
     </LanguageContext.Provider>
   );

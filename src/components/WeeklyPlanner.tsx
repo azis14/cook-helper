@@ -16,7 +16,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
   weeklyPlan,
   onUpdatePlan,
 }) => {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [isGenerating, setIsGenerating] = useState(false);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
 
@@ -136,7 +136,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">{t('myWeeklyPlan')}</h2>
-          <p className="text-gray-600 mt-1">Plan your meals for the week efficiently</p>
+          <p className="text-gray-600 mt-1">Rencanakan menu makan untuk seminggu dengan efisien</p>
         </div>
         <button
           onClick={generateWeeklyPlan}
@@ -144,14 +144,14 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
           className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           <Calendar size={18} />
-          {isGenerating ? 'Generating...' : t('generatePlan')}
+          {isGenerating ? 'Sedang membuat...' : t('generatePlan')}
         </button>
       </div>
 
       {isGenerating && (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Creating your optimal weekly meal plan...</p>
+          <p className="text-gray-600">Sedang membuat rencana menu mingguan yang optimal...</p>
         </div>
       )}
 
@@ -172,25 +172,22 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
                       {day[mealType as keyof DailyMeals] ? (
                         <div className="text-sm">
                           <div className="font-medium text-gray-900 mb-1">
-                            {language === 'en' 
-                              ? (day[mealType as keyof DailyMeals] as Recipe)?.name
-                              : (day[mealType as keyof DailyMeals] as Recipe)?.nameId
-                            }
+                            {(day[mealType as keyof DailyMeals] as Recipe)?.name}
                           </div>
                           <div className="flex items-center gap-2 text-xs text-gray-500">
                             <Clock size={12} />
                             <span>
                               {((day[mealType as keyof DailyMeals] as Recipe)?.prepTime || 0) + 
-                               ((day[mealType as keyof DailyMeals] as Recipe)?.cookTime || 0)}m
+                               ((day[mealType as keyof DailyMeals] as Recipe)?.cookTime || 0)} menit
                             </span>
                             <Users size={12} />
-                            <span>{(day[mealType as keyof DailyMeals] as Recipe)?.servings}</span>
+                            <span>{(day[mealType as keyof DailyMeals] as Recipe)?.servings} porsi</span>
                           </div>
                           <button
                             onClick={() => assignMealToDay(dayIndex, mealType as keyof DailyMeals, null)}
                             className="text-xs text-red-600 hover:text-red-800 mt-1"
                           >
-                            Remove
+                            Hapus
                           </button>
                         </div>
                       ) : (
@@ -204,10 +201,10 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
                             }}
                             className="w-full text-xs border border-gray-300 rounded px-1 py-1"
                           >
-                            <option value="">Select recipe</option>
+                            <option value="">Pilih resep</option>
                             {recipes.map(recipe => (
                               <option key={recipe.id} value={recipe.id}>
-                                {language === 'en' ? recipe.name : recipe.nameId}
+                                {recipe.name}
                               </option>
                             ))}
                           </select>
@@ -229,12 +226,12 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <h4 className="font-medium text-green-800 mb-2">Need to Buy</h4>
+                  <h4 className="font-medium text-green-800 mb-2">Perlu Dibeli</h4>
                   <ul className="space-y-1">
                     {shoppingList.filter(item => item.needed).map(item => (
                       <li key={item.id} className="text-sm text-gray-700">
                         <span className="font-medium">
-                          {language === 'en' ? item.name : item.nameId}
+                          {item.name}
                         </span>
                         <span className="text-gray-500 ml-2">
                           {item.quantity} {t(item.unit)}
@@ -245,12 +242,12 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
                 </div>
                 
                 <div>
-                  <h4 className="font-medium text-blue-800 mb-2">Already Have</h4>
+                  <h4 className="font-medium text-blue-800 mb-2">Sudah Ada</h4>
                   <ul className="space-y-1">
                     {shoppingList.filter(item => !item.needed).map(item => (
                       <li key={item.id} className="text-sm text-gray-500">
                         <span>
-                          {language === 'en' ? item.name : item.nameId}
+                          {item.name}
                         </span>
                         <span className="ml-2">✓</span>
                       </li>
@@ -266,7 +263,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
       {!weeklyPlan && !isGenerating && (
         <div className="text-center py-12">
           <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">Generate your first weekly meal plan to get started!</p>
+          <p className="text-gray-500">Buat rencana menu mingguan pertama Anda untuk memulai!</p>
         </div>
       )}
     </div>

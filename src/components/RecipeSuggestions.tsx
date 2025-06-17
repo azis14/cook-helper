@@ -12,7 +12,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
   ingredients,
   recipes,
 }) => {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [suggestions, setSuggestions] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -23,13 +23,13 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
     // Simulate API call delay
     setTimeout(() => {
       const availableIngredientNames = ingredients.map(ing => 
-        language === 'en' ? ing.name.toLowerCase() : ing.nameId.toLowerCase()
+        ing.name.toLowerCase()
       );
       
       // Filter recipes that can be made with available ingredients
       const matchingRecipes = recipes.filter(recipe => {
         const recipeIngredients = recipe.ingredients.map(ing => 
-          language === 'en' ? ing.name.toLowerCase() : ing.nameId.toLowerCase()
+          ing.name.toLowerCase()
         );
         
         return recipeIngredients.some(ingredient => 
@@ -42,23 +42,23 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
       // Mock AI-generated suggestions if we have ingredients but no matching recipes
       const mockSuggestions: Recipe[] = [];
       
-      if (availableIngredientNames.includes('chicken') || availableIngredientNames.includes('ayam')) {
+      if (availableIngredientNames.includes('ayam') || availableIngredientNames.includes('chicken')) {
         mockSuggestions.push({
           id: 'mock-1',
-          name: 'Chicken Stir Fry',
-          nameId: 'Tumis Ayam',
-          description: 'Quick and healthy chicken stir fry with vegetables',
-          descriptionId: 'Tumis ayam cepat dan sehat dengan sayuran',
+          name: 'Tumis Ayam Sayuran',
+          nameId: 'Tumis Ayam Sayuran',
+          description: 'Tumisan ayam sehat dengan sayuran segar yang mudah dibuat',
+          descriptionId: 'Tumisan ayam sehat dengan sayuran segar yang mudah dibuat',
           ingredients: [
-            { ingredientId: '1', name: 'Chicken', nameId: 'Ayam', quantity: 300, unit: 'gram' },
-            { ingredientId: '2', name: 'Mixed Vegetables', nameId: 'Sayuran Campur', quantity: 200, unit: 'gram' },
+            { ingredientId: '1', name: 'Ayam', nameId: 'Ayam', quantity: 300, unit: 'gram' },
+            { ingredientId: '2', name: 'Sayuran Campur', nameId: 'Sayuran Campur', quantity: 200, unit: 'gram' },
           ],
           instructions: [
-            'Cut chicken into small pieces',
-            'Heat oil in a wok or large pan',
-            'Stir fry chicken until cooked',
-            'Add vegetables and stir fry for 3-4 minutes',
-            'Season with salt, pepper, and soy sauce'
+            'Potong ayam menjadi potongan kecil',
+            'Panaskan minyak di wajan atau panci besar',
+            'Tumis ayam sampai matang',
+            'Tambahkan sayuran dan tumis selama 3-4 menit',
+            'Bumbui dengan garam, merica, dan kecap asin'
           ],
           instructionsId: [
             'Potong ayam menjadi potongan kecil',
@@ -71,27 +71,27 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
           cookTime: 15,
           servings: 4,
           difficulty: 'easy',
-          tags: ['quick', 'healthy'],
+          tags: ['cepat', 'sehat'],
         });
       }
 
-      if (availableIngredientNames.includes('rice') || availableIngredientNames.includes('nasi')) {
+      if (availableIngredientNames.includes('nasi') || availableIngredientNames.includes('beras')) {
         mockSuggestions.push({
           id: 'mock-2',
-          name: 'Fried Rice',
-          nameId: 'Nasi Goreng',
-          description: 'Classic Indonesian fried rice with eggs and vegetables',
+          name: 'Nasi Goreng Spesial',
+          nameId: 'Nasi Goreng Spesial',
+          description: 'Nasi goreng Indonesia klasik dengan telur dan sayuran',
           descriptionId: 'Nasi goreng Indonesia klasik dengan telur dan sayuran',
           ingredients: [
-            { ingredientId: '1', name: 'Cooked Rice', nameId: 'Nasi Matang', quantity: 2, unit: 'piece' },
-            { ingredientId: '2', name: 'Eggs', nameId: 'Telur', quantity: 2, unit: 'piece' },
+            { ingredientId: '1', name: 'Nasi Matang', nameId: 'Nasi Matang', quantity: 2, unit: 'piece' },
+            { ingredientId: '2', name: 'Telur', nameId: 'Telur', quantity: 2, unit: 'piece' },
           ],
           instructions: [
-            'Heat oil in a wok',
-            'Scramble the eggs and set aside',
-            'Stir fry rice with seasonings',
-            'Add eggs back and mix well',
-            'Serve hot with crackers'
+            'Panaskan minyak di wajan',
+            'Orak-arik telur dan sisihkan',
+            'Tumis nasi dengan bumbu',
+            'Masukkan kembali telur dan aduk rata',
+            'Sajikan panas dengan kerupuk'
           ],
           instructionsId: [
             'Panaskan minyak di wajan',
@@ -104,7 +104,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
           cookTime: 10,
           servings: 2,
           difficulty: 'easy',
-          tags: ['quick', 'indonesian'],
+          tags: ['cepat', 'indonesia'],
         });
       }
 
@@ -133,14 +133,14 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
       {ingredients.length === 0 && (
         <div className="text-center py-12">
           <Lightbulb size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">Add some ingredients first to get recipe suggestions!</p>
+          <p className="text-gray-500">Tambahkan beberapa bahan terlebih dahulu untuk mendapatkan saran resep!</p>
         </div>
       )}
 
       {isLoading && (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Generating recipe suggestions...</p>
+          <p className="text-gray-600">Sedang membuat saran resep...</p>
         </div>
       )}
 
@@ -154,23 +154,23 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
               <div className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="font-semibold text-gray-900 text-lg">
-                    {language === 'en' ? recipe.name : recipe.nameId}
+                    {recipe.name}
                   </h3>
                   <Lightbulb className="text-yellow-500" size={20} />
                 </div>
                 
                 <p className="text-sm text-gray-600 mb-3">
-                  {language === 'en' ? recipe.description : recipe.descriptionId}
+                  {recipe.description}
                 </p>
                 
                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
                   <div className="flex items-center gap-1">
                     <Clock size={14} />
-                    <span>{recipe.prepTime + recipe.cookTime}m</span>
+                    <span>{recipe.prepTime + recipe.cookTime} menit</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Users size={14} />
-                    <span>{recipe.servings}</span>
+                    <span>{recipe.servings} porsi</span>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-xs ${
                     recipe.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
@@ -182,32 +182,29 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                 </div>
                 
                 <div className="mb-3">
-                  <h4 className="font-medium text-gray-900 mb-2">{t('ingredients')}:</h4>
+                  <h4 className="font-medium text-gray-900 mb-2">Bahan-bahan:</h4>
                   <ul className="text-sm text-gray-600 space-y-1">
                     {recipe.ingredients.slice(0, 3).map((ingredient, index) => (
                       <li key={index}>
-                        • {ingredient.quantity} {t(ingredient.unit)} {
-                          language === 'en' ? ingredient.name : ingredient.nameId
-                        }
+                        • {ingredient.quantity} {t(ingredient.unit)} {ingredient.name}
                       </li>
                     ))}
                     {recipe.ingredients.length > 3 && (
-                      <li className="text-gray-500">+ {recipe.ingredients.length - 3} more</li>
+                      <li className="text-gray-500">+ {recipe.ingredients.length - 3} bahan lainnya</li>
                     )}
                   </ul>
                 </div>
                 
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">{t('instructions')}:</h4>
+                  <h4 className="font-medium text-gray-900 mb-2">Cara memasak:</h4>
                   <ol className="text-sm text-gray-600 space-y-1">
-                    {(language === 'en' ? recipe.instructions : recipe.instructionsId)
-                      .slice(0, 2).map((instruction, index) => (
+                    {recipe.instructions.slice(0, 2).map((instruction, index) => (
                       <li key={index}>
                         {index + 1}. {instruction}
                       </li>
                     ))}
                     {recipe.instructions.length > 2 && (
-                      <li className="text-gray-500">+ {recipe.instructions.length - 2} more steps</li>
+                      <li className="text-gray-500">+ {recipe.instructions.length - 2} langkah lainnya</li>
                     )}
                   </ol>
                 </div>
@@ -220,7 +217,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
       {suggestions.length === 0 && !isLoading && ingredients.length > 0 && (
         <div className="text-center py-12">
           <ChefHat size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">No recipe suggestions found. Try generating suggestions!</p>
+          <p className="text-gray-500">Tidak ada saran resep ditemukan. Coba buat saran resep!</p>
         </div>
       )}
     </div>
