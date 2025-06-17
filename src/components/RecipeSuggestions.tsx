@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Lightbulb, RefreshCw, Clock, Users, ChefHat, Sparkles } from 'lucide-react';
+import { Lightbulb, RefreshCw, Clock, Users, ChefHat, Sparkles, Save } from 'lucide-react';
 import { Recipe, Ingredient } from '../types';
 import GeminiService from '../services/geminiService';
+import { useRecipes } from '../hooks/useRecipes';
+import { useAuth } from '../hooks/useAuth';
 
 interface RecipeSuggestionsProps {
   ingredients: Ingredient[];
@@ -12,9 +14,12 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
   ingredients,
   recipes,
 }) => {
+  const { user } = useAuth();
+  const { addRecipe } = useRecipes(user?.id);
   const [suggestions, setSuggestions] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savingRecipeId, setSavingRecipeId] = useState<string | null>(null);
 
   const difficultyTranslations = {
     easy: 'Mudah',
@@ -158,6 +163,45 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
     }, 1500);
   };
 
+  const saveRecipeToCollection = async (recipe: Recipe) => {
+    if (!user?.id) return;
+
+    setSavingRecipeId(recipe.id);
+    
+    try {
+      const recipeData = {
+        name: recipe.name,
+        description: recipe.description,
+        prep_time: recipe.prep_time,
+        cook_time: recipe.cook_time,
+        servings: recipe.servings,
+        difficulty: recipe.difficulty,
+        instructions: recipe.instructions,
+        tags: recipe.tags,
+      };
+
+      const ingredients = recipe.recipe_ingredients?.map(ing => ({
+        name: ing.name,
+        quantity: ing.quantity,
+        unit: ing.unit,
+      })) || [];
+
+      await addRecipe(recipeData, ingredients);
+      
+      // Show success feedback
+      alert('Resep berhasil disimpan ke koleksi Anda!');
+    } catch (err) {
+      console.error('Error saving recipe:', err);
+      alert('Gagal menyimpan resep. Silakan coba lagi.');
+    } finally {
+      setSavingRecipeId(null);
+    }
+  };
+
+  const isAIGenerated = (recipe: Recipe) => {
+    return recipe.user_id === 'ai-generated' || recipe.id.startsWith('mock-') || recipe.id.startsWith('gemini-');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -218,7 +262,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                     {recipe.name}
                   </h3>
                   <div className="flex items-center gap-1">
-                    {recipe.user_id === 'ai-generated' ? (
+                    {isAIGenerated(recipe) ? (
                       <Sparkles className="text-purple-500" size={20} />
                     ) : (
                       <Lightbulb className="text-yellow-500" size={20} />
@@ -262,7 +306,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                   </ul>
                 </div>
                 
-                <div>
+                <div className="mb-4">
                   <h4 className="font-medium text-gray-900 mb-2">Cara memasak:</h4>
                   <ol className="text-sm text-gray-600 space-y-1">
                     {(recipe.instructions || []).slice(0, 2).map((instruction, index) => (
@@ -277,7 +321,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                 </div>
 
                 {recipe.tags && recipe.tags.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1">
+                  <div className="mb-4 flex flex-wrap gap-1">
                     {recipe.tags.slice(0, 3).map((tag, index) => (
                       <span
                         key={index}
@@ -287,6 +331,18 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                       </span>
                     ))}
                   </div>
+                )}
+
+                {/* Save Recipe Button - only show for AI generated or mock recipes */}
+                {isAIGenerated(recipe) && (
+                  <button
+                    onClick={() => saveRecipeToCollection(recipe)}
+                    disabled={savingRecipeId === recipe.id}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    <Save size={16} />
+                    {savingRecipeId === recipe.id ? 'Menyimpan...' : 'Simpan Resep'}
+                  </button>
                 )}
               </div>
             </div>
