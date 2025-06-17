@@ -46,12 +46,10 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
         mockSuggestions.push({
           id: 'mock-1',
           name: 'Tumis Ayam Sayuran',
-          nameId: 'Tumis Ayam Sayuran',
           description: 'Tumisan ayam sehat dengan sayuran segar yang mudah dibuat',
-          descriptionId: 'Tumisan ayam sehat dengan sayuran segar yang mudah dibuat',
           recipe_ingredients: [
-            { ingredientId: '1', name: 'Ayam', nameId: 'Ayam', quantity: 300, unit: 'gram' },
-            { ingredientId: '2', name: 'Sayuran Campur', nameId: 'Sayuran Campur', quantity: 200, unit: 'gram' },
+            { id: '1', recipe_id: 'mock-1', name: 'Ayam', quantity: 300, unit: 'gram' },
+            { id: '2', recipe_id: 'mock-1', name: 'Sayuran Campur', quantity: 200, unit: 'gram' },
           ],
           instructions: [
             'Potong ayam menjadi potongan kecil',
@@ -60,18 +58,12 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
             'Tambahkan sayuran dan tumis selama 3-4 menit',
             'Bumbui dengan garam, merica, dan kecap asin'
           ],
-          instructionsId: [
-            'Potong ayam menjadi potongan kecil',
-            'Panaskan minyak di wajan atau panci besar',
-            'Tumis ayam sampai matang',
-            'Tambahkan sayuran dan tumis selama 3-4 menit',
-            'Bumbui dengan garam, merica, dan kecap asin'
-          ],
-          prepTime: 10,
-          cookTime: 15,
+          prep_time: 10,
+          cook_time: 15,
           servings: 4,
           difficulty: 'easy',
           tags: ['cepat', 'sehat'],
+          user_id: 'mock-user',
         });
       }
 
@@ -79,12 +71,10 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
         mockSuggestions.push({
           id: 'mock-2',
           name: 'Nasi Goreng Spesial',
-          nameId: 'Nasi Goreng Spesial',
           description: 'Nasi goreng Indonesia klasik dengan telur dan sayuran',
-          descriptionId: 'Nasi goreng Indonesia klasik dengan telur dan sayuran',
           recipe_ingredients: [
-            { ingredientId: '1', name: 'Nasi Matang', nameId: 'Nasi Matang', quantity: 2, unit: 'piece' },
-            { ingredientId: '2', name: 'Telur', nameId: 'Telur', quantity: 2, unit: 'piece' },
+            { id: '1', recipe_id: 'mock-2', name: 'Nasi Matang', quantity: 2, unit: 'piring' },
+            { id: '2', recipe_id: 'mock-2', name: 'Telur', quantity: 2, unit: 'butir' },
           ],
           instructions: [
             'Panaskan minyak di wajan',
@@ -93,18 +83,12 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
             'Masukkan kembali telur dan aduk rata',
             'Sajikan panas dengan kerupuk'
           ],
-          instructionsId: [
-            'Panaskan minyak di wajan',
-            'Orak-arik telur dan sisihkan',
-            'Tumis nasi dengan bumbu',
-            'Masukkan kembali telur dan aduk rata',
-            'Sajikan panas dengan kerupuk'
-          ],
-          prepTime: 5,
-          cookTime: 10,
+          prep_time: 5,
+          cook_time: 10,
           servings: 2,
           difficulty: 'easy',
           tags: ['cepat', 'indonesia'],
+          user_id: 'mock-user',
         });
       }
 
@@ -166,7 +150,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
                   <div className="flex items-center gap-1">
                     <Clock size={14} />
-                    <span>{recipe.prepTime + recipe.cookTime} menit</span>
+                    <span>{recipe.prep_time + recipe.cook_time} menit</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Users size={14} />
@@ -184,13 +168,13 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                 <div className="mb-3">
                   <h4 className="font-medium text-gray-900 mb-2">Bahan-bahan:</h4>
                   <ul className="text-sm text-gray-600 space-y-1">
-                    {(recipe.recipe_ingredients ?? []).slice(0, 3).map((ingredient, index) => (
+                    {(recipe.recipe_ingredients || []).slice(0, 3).map((ingredient, index) => (
                       <li key={index}>
                         • {ingredient.quantity} {t(ingredient.unit)} {ingredient.name}
                       </li>
                     ))}
-                    {(recipe.recipe_ingredients ?? []).length > 3 && (
-                      <li className="text-gray-500">+ {(recipe.recipe_ingredients ?? []).length - 3} bahan lainnya</li>
+                    {(recipe.recipe_ingredients || []).length > 3 && (
+                      <li className="text-gray-500">+ {(recipe.recipe_ingredients || []).length - 3} bahan lainnya</li>
                     )}
                   </ul>
                 </div>
@@ -198,13 +182,13 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Cara memasak:</h4>
                   <ol className="text-sm text-gray-600 space-y-1">
-                    {recipe.instructions.slice(0, 2).map((instruction, index) => (
+                    {(recipe.instructions || []).slice(0, 2).map((instruction, index) => (
                       <li key={index}>
                         {index + 1}. {instruction}
                       </li>
                     ))}
-                    {recipe.instructions.length > 2 && (
-                      <li className="text-gray-500">+ {recipe.instructions.length - 2} langkah lainnya</li>
+                    {(recipe.instructions || []).length > 2 && (
+                      <li className="text-gray-500">+ {(recipe.instructions || []).length - 2} langkah lainnya</li>
                     )}
                   </ol>
                 </div>

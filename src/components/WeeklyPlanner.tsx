@@ -57,8 +57,9 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
       
       const newPlan: WeeklyPlan = {
         id: 'plan-' + Date.now(),
-        week: currentWeek,
-        meals: dailyMeals,
+        week_start: currentWeek,
+        user_id: 'current-user',
+        daily_meals: dailyMeals,
       };
       
       onUpdatePlan(newPlan);
@@ -71,10 +72,10 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     const neededIngredients: Record<string, ShoppingItem> = {};
     
     // Collect all ingredients needed for the week
-    plan.meals.forEach(day => {
+    (plan.daily_meals || []).forEach(day => {
       [day.breakfast, day.lunch, day.dinner].forEach(recipe => {
-        if (recipe) {
-          recipe.ingredients.forEach(ingredient => {
+        if (recipe && recipe.recipe_ingredients) {
+          recipe.recipe_ingredients.forEach(ingredient => {
             const key = ingredient.name.toLowerCase();
             if (neededIngredients[key]) {
               neededIngredients[key].quantity += ingredient.quantity;
@@ -82,7 +83,6 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
               neededIngredients[key] = {
                 id: 'shopping-' + Date.now() + Math.random(),
                 name: ingredient.name,
-                nameId: ingredient.nameId,
                 quantity: ingredient.quantity,
                 unit: ingredient.unit,
                 category: 'general',
@@ -114,9 +114,9 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
   };
 
   const assignMealToDay = (dayIndex: number, mealType: keyof DailyMeals, recipe: Recipe | null) => {
-    if (!weeklyPlan) return;
+    if (!weeklyPlan || !weeklyPlan.daily_meals) return;
     
-    const updatedMeals = [...weeklyPlan.meals];
+    const updatedMeals = [...weeklyPlan.daily_meals];
     updatedMeals[dayIndex] = {
       ...updatedMeals[dayIndex],
       [mealType]: recipe,
@@ -124,7 +124,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     
     const updatedPlan = {
       ...weeklyPlan,
-      meals: updatedMeals,
+      daily_meals: updatedMeals,
     };
     
     onUpdatePlan(updatedPlan);
@@ -155,10 +155,10 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
         </div>
       )}
 
-      {weeklyPlan && !isGenerating && (
+      {weeklyPlan && weeklyPlan.daily_meals && !isGenerating && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
-            {weeklyPlan.meals.map((day, dayIndex) => (
+            {weeklyPlan.daily_meals.map((day, dayIndex) => (
               <div key={dayIndex} className="bg-white rounded-lg shadow-md border border-blue-100 p-4">
                 <h3 className="font-semibold text-gray-900 mb-3 text-center">
                   {t(days[dayIndex])}
@@ -177,8 +177,8 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
                           <div className="flex items-center gap-2 text-xs text-gray-500">
                             <Clock size={12} />
                             <span>
-                              {((day[mealType as keyof DailyMeals] as Recipe)?.prepTime || 0) + 
-                               ((day[mealType as keyof DailyMeals] as Recipe)?.cookTime || 0)} menit
+                              {((day[mealType as keyof DailyMeals] as Recipe)?.prep_time || 0) + 
+                               ((day[mealType as keyof DailyMeals] as Recipe)?.cook_time || 0)} menit
                             </span>
                             <Users size={12} />
                             <span>{(day[mealType as keyof DailyMeals] as Recipe)?.servings} porsi</span>
