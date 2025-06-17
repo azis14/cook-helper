@@ -41,11 +41,17 @@ export const IngredientManager: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Convert empty string to null for expiry_date
+      const dataToSubmit = {
+        ...formData,
+        expiry_date: formData.expiry_date === '' ? null : formData.expiry_date,
+      };
+
       if (editingId) {
-        await updateIngredient(editingId, formData);
+        await updateIngredient(editingId, dataToSubmit);
         setEditingId(null);
       } else {
-        await addIngredient(formData);
+        await addIngredient(dataToSubmit);
       }
       setFormData({
         name: '',
