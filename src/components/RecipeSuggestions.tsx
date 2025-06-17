@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Lightbulb, RefreshCw, Clock, Users, ChefHat } from 'lucide-react';
+import { Lightbulb, RefreshCw, Clock, Users, ChefHat, Sparkles } from 'lucide-react';
 import { Recipe, Ingredient } from '../types';
+import GeminiService from '../services/geminiService';
 
 interface RecipeSuggestionsProps {
   ingredients: Ingredient[];
@@ -13,6 +14,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
 }) => {
   const [suggestions, setSuggestions] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const difficultyTranslations = {
     easy: 'Mudah',
@@ -29,13 +31,57 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
     clove: 'siung',
     piring: 'piring',
     butir: 'butir',
+    sendok: 'sendok',
+    gelas: 'gelas',
   };
 
-  // Mock AI suggestions based on available ingredients
-  const generateSuggestions = () => {
+  const generateAISuggestions = async () => {
+    if (!ingredients.length) return;
+
     setIsLoading(true);
+    setError(null);
+
+    try {
+      const apiKey = import.meta.env.VITE_GOOGLE_AI_API_KEY;
+      
+      if (!apiKey) {
+        throw new Error('Google AI API key tidak ditemukan. Pastikan VITE_GOOGLE_AI_API_KEY sudah diatur di file .env');
+      }
+
+      const geminiService = new GeminiService(apiKey);
+      const aiSuggestions = await geminiService.generateRecipeSuggestions(ingredients);
+      
+      // Also include matching existing recipes
+      const availableIngredientNames = ingredients.map(ing => 
+        ing.name.toLowerCase()
+      );
+      
+      const matchingRecipes = recipes.filter(recipe => {
+        const recipeIngredients = recipe.recipe_ingredients?.map(ing => 
+          ing.name.toLowerCase()
+        ) || [];
+        
+        return recipeIngredients.some(ingredient => 
+          availableIngredientNames.some(available => 
+            available.includes(ingredient) || ingredient.includes(available)
+          )
+        );
+      });
+
+      setSuggestions([...aiSuggestions, ...matchingRecipes]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat membuat saran resep');
+      console.error('Error generating AI suggestions:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const generateBasicSuggestions = () => {
+    setIsLoading(true);
+    setError(null);
     
-    // Simulate API call delay
+    // Simulate API call delay for basic suggestions
     setTimeout(() => {
       const availableIngredientNames = ingredients.map(ing => 
         ing.name.toLowerCase()
@@ -54,7 +100,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
         );
       });
 
-      // Mock AI-generated suggestions if we have ingredients but no matching recipes
+      // Mock basic suggestions if we have ingredients but no matching recipes
       const mockSuggestions: Recipe[] = [];
       
       if (availableIngredientNames.includes('ayam') || availableIngredientNames.includes('chicken')) {
@@ -119,15 +165,31 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
           <h2 className="text-2xl font-bold text-gray-900">Saran Resep</h2>
           <p className="text-gray-600 mt-1">Berdasarkan bahan yang tersedia</p>
         </div>
-        <button
-          onClick={generateSuggestions}
-          disabled={isLoading || ingredients.length === 0}
-          className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
-          <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-          Buat Saran Resep
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={generateBasicSuggestions}
+            disabled={isLoading || ingredients.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+            Saran Dasar
+          </button>
+          <button
+            onClick={generateAISuggestions}
+            disabled={isLoading || ingredients.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            <Sparkles size={18} className={isLoading ? 'animate-spin' : ''} />
+            Saran AI
+          </button>
+        </div>
       </div>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
 
       {ingredients.length === 0 && (
         <div className="text-center py-12">
@@ -155,7 +217,13 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                   <h3 className="font-semibold text-gray-900 text-lg">
                     {recipe.name}
                   </h3>
-                  <Lightbulb className="text-yellow-500" size={20} />
+                  <div className="flex items-center gap-1">
+                    {recipe.user_id === 'ai-generated' ? (
+                      <Sparkles className="text-purple-500" size={20} />
+                    ) : (
+                      <Lightbulb className="text-yellow-500" size={20} />
+                    )}
+                  </div>
                 </div>
                 
                 <p className="text-sm text-gray-600 mb-3">
@@ -207,13 +275,26 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                     )}
                   </ol>
                 </div>
+
+                {recipe.tags && recipe.tags.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {recipe.tags.slice(0, 3).map((tag, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {suggestions.length === 0 && !isLoading && ingredients.length > 0 && (
+      {suggestions.length === 0 && !isLoading && ingredients.length > 0 && !error && (
         <div className="text-center py-12">
           <ChefHat size={48} className="mx-auto text-gray-400 mb-4" />
           <p className="text-gray-500">Tidak ada saran resep ditemukan. Coba buat saran resep!</p>
