@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Lightbulb, RefreshCw, Clock, Users, ChefHat, Sparkles, Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lightbulb, RefreshCw, Clock, Users, ChefHat, Sparkles, Save, Check } from 'lucide-react';
 import { Recipe, Ingredient } from '../types';
 import GeminiService from '../services/geminiService';
 import { useRecipes } from '../hooks/useRecipes';
@@ -8,11 +8,15 @@ import { useAuth } from '../hooks/useAuth';
 interface RecipeSuggestionsProps {
   ingredients: Ingredient[];
   recipes: Recipe[];
+  showSuccess: (message: string) => void;
+  showError: (message: string) => void;
 }
 
 export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
   ingredients,
   recipes,
+  showSuccess,
+  showError,
 }) => {
   const { user } = useAuth();
   const { addRecipe } = useRecipes(user?.id);
@@ -20,6 +24,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savingRecipeId, setSavingRecipeId] = useState<string | null>(null);
+  const [savedRecipeIds, setSavedRecipeIds] = useState<Set<string>>(new Set());
 
   const difficultyTranslations = {
     easy: 'Mudah',
@@ -39,6 +44,40 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
     sendok: 'sendok',
     gelas: 'gelas',
   };
+
+  // Load saved suggestions from localStorage on component mount
+  useEffect(() => {
+    const savedSuggestions = localStorage.getItem('recipe-suggestions');
+    const savedRecipeIdsStorage = localStorage.getItem('saved-recipe-ids');
+    
+    if (savedSuggestions) {
+      try {
+        setSuggestions(JSON.parse(savedSuggestions));
+      } catch (err) {
+        console.error('Error parsing saved suggestions:', err);
+      }
+    }
+
+    if (savedRecipeIdsStorage) {
+      try {
+        setSavedRecipeIds(new Set(JSON.parse(savedRecipeIdsStorage)));
+      } catch (err) {
+        console.error('Error parsing saved recipe IDs:', err);
+      }
+    }
+  }, []);
+
+  // Save suggestions to localStorage whenever they change
+  useEffect(() => {
+    if (suggestions.length > 0) {
+      localStorage.setItem('recipe-suggestions', JSON.stringify(suggestions));
+    }
+  }, [suggestions]);
+
+  // Save savedRecipeIds to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('saved-recipe-ids', JSON.stringify(Array.from(savedRecipeIds)));
+  }, [savedRecipeIds]);
 
   const generateAISuggestions = async () => {
     if (!ingredients.length) return;
@@ -75,7 +114,9 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
 
       setSuggestions([...aiSuggestions, ...matchingRecipes]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat membuat saran resep');
+      const errorMessage = err instanceof Error ? err.message : 'Terjadi kesalahan saat membuat saran resep';
+      setError(errorMessage);
+      showError(errorMessage);
       console.error('Error generating AI suggestions:', err);
     } finally {
       setIsLoading(false);
@@ -188,11 +229,14 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
 
       await addRecipe(recipeData, ingredients);
       
-      // Show success feedback
-      alert('Resep berhasil disimpan ke koleksi Anda!');
+      // Mark recipe as saved
+      setSavedRecipeIds(prev => new Set([...prev, recipe.id]));
+      
+      // Show success toast
+      showSuccess('Resep berhasil disimpan ke koleksi Anda!');
     } catch (err) {
       console.error('Error saving recipe:', err);
-      alert('Gagal menyimpan resep. Silakan coba lagi.');
+      showError('Gagal menyimpan resep. Silakan coba lagi.');
     } finally {
       setSavingRecipeId(null);
     }
@@ -200,6 +244,10 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
 
   const isAIGenerated = (recipe: Recipe) => {
     return recipe.user_id === 'ai-generated' || recipe.id.startsWith('mock-') || recipe.id.startsWith('gemini-');
+  };
+
+  const isRecipeSaved = (recipe: Recipe) => {
+    return savedRecipeIds.has(recipe.id);
   };
 
   return (
@@ -337,11 +385,26 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                 {isAIGenerated(recipe) && (
                   <button
                     onClick={() => saveRecipeToCollection(recipe)}
-                    disabled={savingRecipeId === recipe.id}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    disabled={savingRecipeId === recipe.id || isRecipeSaved(recipe)}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                      isRecipeSaved(recipe)
+                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                        : savingRecipeId === recipe.id
+                        ? 'bg-gray-400 text-white cursor-not-allowed'
+                        : 'bg-green-500 text-white hover:bg-green-600'
+                    }`}
                   >
-                    <Save size={16} />
-                    {savingRecipeId === recipe.id ? 'Menyimpan...' : 'Simpan Resep'}
+                    {isRecipeSaved(recipe) ? (
+                      <>
+                        <Check size={16} />
+                        Sudah Disimpan
+                      </>
+                    ) : (
+                      <>
+                        <Save size={16} />
+                        {savingRecipeId === recipe.id ? 'Menyimpan...' : 'Simpan Resep'}
+                      </>
+                    )}
                   </button>
                 )}
               </div>

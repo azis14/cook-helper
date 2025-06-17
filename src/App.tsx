@@ -6,9 +6,11 @@ import { RecipeManager } from './components/RecipeManager';
 import { RecipeSuggestions } from './components/RecipeSuggestions';
 import { WeeklyPlanner } from './components/WeeklyPlanner';
 import { AuthForm } from './components/AuthForm';
+import { Toast } from './components/Toast';
 import { useAuth } from './hooks/useAuth';
 import { useIngredients } from './hooks/useIngredients';
 import { useRecipes } from './hooks/useRecipes';
+import { useToast } from './hooks/useToast';
 import { signOut } from './lib/supabase';
 import { LogOut } from 'lucide-react';
 
@@ -16,6 +18,7 @@ function App() {
   const { user, loading } = useAuth();
   const { ingredients } = useIngredients(user?.id);
   const { recipes } = useRecipes(user?.id);
+  const { toasts, showSuccess, showError, hideToast } = useToast();
   const [activeTab, setActiveTab] = useState('ingredients');
 
   const handleSignOut = async () => {
@@ -29,7 +32,14 @@ function App() {
       case 'recipes':
         return <RecipeManager />;
       case 'suggestions':
-        return <RecipeSuggestions ingredients={ingredients} recipes={recipes} />;
+        return (
+          <RecipeSuggestions 
+            ingredients={ingredients} 
+            recipes={recipes}
+            showSuccess={showSuccess}
+            showError={showError}
+          />
+        );
       case 'weekly-plan':
         return <WeeklyPlanner ingredients={ingredients} recipes={recipes} />;
       default:
@@ -68,6 +78,16 @@ function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderActiveTab()}
       </main>
+
+      {/* Toast notifications */}
+      {toasts.map((toast) => (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => hideToast(toast.id)}
+        />
+      ))}
     </div>
   );
 }
