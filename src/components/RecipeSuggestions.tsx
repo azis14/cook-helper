@@ -184,13 +184,13 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                 <div className="mb-3">
                   <h4 className="font-medium text-gray-900 mb-2">Bahan-bahan:</h4>
                   <ul className="text-sm text-gray-600 space-y-1">
-                    {recipe.recipe_ingredients?.slice(0, 3).map((ingredient, index) => (
+                    {(recipe.recipe_ingredients ?? []).slice(0, 3).map((ingredient, index) => (
                       <li key={index}>
                         • {ingredient.quantity} {t(ingredient.unit)} {ingredient.name}
                       </li>
                     ))}
-                    {recipe.recipe_ingredients && recipe.recipe_ingredients.length > 3 && (
-                      <li className="text-gray-500">+ {recipe.recipe_ingredients.length - 3} bahan lainnya</li>
+                    {(recipe.recipe_ingredients ?? []).length > 3 && (
+                      <li className="text-gray-500">+ {(recipe.recipe_ingredients ?? []).length - 3} bahan lainnya</li>
                     )}
                   </ul>
                 </div>
