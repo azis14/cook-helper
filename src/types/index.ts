@@ -14,7 +14,7 @@ export interface Recipe {
   nameId: string;
   description: string;
   descriptionId: string;
-  ingredients: RecipeIngredient[];
+  recipe_ingredients: RecipeIngredient[];
   instructions: string[];
   instructionsId: string[];
   prepTime: number;
