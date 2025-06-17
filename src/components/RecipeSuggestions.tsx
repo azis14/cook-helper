@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lightbulb, RefreshCw, Clock, Users, ChefHat, Sparkles, Save, Check } from 'lucide-react';
+import { Lightbulb, Clock, Users, ChefHat, Sparkles, Save, Check } from 'lucide-react';
 import { Recipe, Ingredient } from '../types';
 import GeminiService from '../services/geminiService';
 import { useRecipes } from '../hooks/useRecipes';
@@ -95,24 +95,8 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
       const geminiService = new GeminiService(apiKey);
       const aiSuggestions = await geminiService.generateRecipeSuggestions(ingredients);
       
-      // Also include matching existing recipes
-      const availableIngredientNames = ingredients.map(ing => 
-        ing.name.toLowerCase()
-      );
-      
-      const matchingRecipes = recipes.filter(recipe => {
-        const recipeIngredients = recipe.recipe_ingredients?.map(ing => 
-          ing.name.toLowerCase()
-        ) || [];
-        
-        return recipeIngredients.some(ingredient => 
-          availableIngredientNames.some(available => 
-            available.includes(ingredient) || ingredient.includes(available)
-          )
-        );
-      });
-
-      setSuggestions([...aiSuggestions, ...matchingRecipes]);
+      // Only show AI-generated suggestions, don't include existing recipes
+      setSuggestions(aiSuggestions);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Terjadi kesalahan saat membuat saran resep';
       setError(errorMessage);
@@ -121,87 +105,6 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const generateBasicSuggestions = () => {
-    setIsLoading(true);
-    setError(null);
-    
-    // Simulate API call delay for basic suggestions
-    setTimeout(() => {
-      const availableIngredientNames = ingredients.map(ing => 
-        ing.name.toLowerCase()
-      );
-      
-      // Filter recipes that can be made with available ingredients
-      const matchingRecipes = recipes.filter(recipe => {
-        const recipeIngredients = recipe.recipe_ingredients?.map(ing => 
-          ing.name.toLowerCase()
-        ) || [];
-        
-        return recipeIngredients.some(ingredient => 
-          availableIngredientNames.some(available => 
-            available.includes(ingredient) || ingredient.includes(available)
-          )
-        );
-      });
-
-      // Mock basic suggestions if we have ingredients but no matching recipes
-      const mockSuggestions: Recipe[] = [];
-      
-      if (availableIngredientNames.includes('ayam') || availableIngredientNames.includes('chicken')) {
-        mockSuggestions.push({
-          id: 'mock-1',
-          name: 'Tumis Ayam Sayuran',
-          description: 'Tumisan ayam sehat dengan sayuran segar yang mudah dibuat',
-          recipe_ingredients: [
-            { id: '1', recipe_id: 'mock-1', name: 'Ayam', quantity: 300, unit: 'gram' },
-            { id: '2', recipe_id: 'mock-1', name: 'Sayuran Campur', quantity: 200, unit: 'gram' },
-          ],
-          instructions: [
-            'Potong ayam menjadi potongan kecil',
-            'Panaskan minyak di wajan atau panci besar',
-            'Tumis ayam sampai matang',
-            'Tambahkan sayuran dan tumis selama 3-4 menit',
-            'Bumbui dengan garam, merica, dan kecap asin'
-          ],
-          prep_time: 10,
-          cook_time: 15,
-          servings: 4,
-          difficulty: 'easy',
-          tags: ['cepat', 'sehat'],
-          user_id: 'mock-user',
-        });
-      }
-
-      if (availableIngredientNames.includes('nasi') || availableIngredientNames.includes('beras')) {
-        mockSuggestions.push({
-          id: 'mock-2',
-          name: 'Nasi Goreng Spesial',
-          description: 'Nasi goreng Indonesia klasik dengan telur dan sayuran',
-          recipe_ingredients: [
-            { id: '1', recipe_id: 'mock-2', name: 'Nasi Matang', quantity: 2, unit: 'piring' },
-            { id: '2', recipe_id: 'mock-2', name: 'Telur', quantity: 2, unit: 'butir' },
-          ],
-          instructions: [
-            'Panaskan minyak di wajan',
-            'Orak-arik telur dan sisihkan',
-            'Tumis nasi dengan bumbu',
-            'Masukkan kembali telur dan aduk rata',
-            'Sajikan panas dengan kerupuk'
-          ],
-          prep_time: 5,
-          cook_time: 10,
-          servings: 2,
-          difficulty: 'easy',
-          tags: ['cepat', 'indonesia'],
-          user_id: 'mock-user',
-        });
-      }
-
-      setSuggestions([...matchingRecipes, ...mockSuggestions]);
-      setIsLoading(false);
-    }, 1500);
   };
 
   const saveRecipeToCollection = async (recipe: Recipe) => {
@@ -254,27 +157,17 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Saran Resep</h2>
-          <p className="text-gray-600 mt-1">Berdasarkan bahan yang tersedia</p>
+          <h2 className="text-2xl font-bold text-gray-900">Saran Resep AI</h2>
+          <p className="text-gray-600 mt-1">Resep pintar berdasarkan bahan yang tersedia</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={generateBasicSuggestions}
-            disabled={isLoading || ingredients.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-            Saran Dasar
-          </button>
-          <button
-            onClick={generateAISuggestions}
-            disabled={isLoading || ingredients.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            <Sparkles size={18} className={isLoading ? 'animate-spin' : ''} />
-            Saran AI
-          </button>
-        </div>
+        <button
+          onClick={generateAISuggestions}
+          disabled={isLoading || ingredients.length === 0}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+        >
+          <Sparkles size={18} className={isLoading ? 'animate-spin' : ''} />
+          {isLoading ? 'Sedang membuat...' : 'Buat Saran AI'}
+        </button>
       </div>
 
       {error && (
@@ -286,14 +179,14 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
       {ingredients.length === 0 && (
         <div className="text-center py-12">
           <Lightbulb size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">Tambahkan beberapa bahan terlebih dahulu untuk mendapatkan saran resep!</p>
+          <p className="text-gray-500">Tambahkan beberapa bahan terlebih dahulu untuk mendapatkan saran resep AI!</p>
         </div>
       )}
 
       {isLoading && (
         <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Sedang membuat saran resep...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">AI sedang membuat saran resep khusus untuk Anda...</p>
         </div>
       )}
 
@@ -302,7 +195,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
           {suggestions.map((recipe) => (
             <div
               key={recipe.id}
-              className="bg-white rounded-lg shadow-md border border-yellow-100 overflow-hidden hover:shadow-lg transition-shadow"
+              className="bg-white rounded-lg shadow-md border border-purple-100 overflow-hidden hover:shadow-lg transition-shadow"
             >
               <div className="p-4">
                 <div className="flex items-start justify-between mb-3">
@@ -310,11 +203,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                     {recipe.name}
                   </h3>
                   <div className="flex items-center gap-1">
-                    {isAIGenerated(recipe) ? (
-                      <Sparkles className="text-purple-500" size={20} />
-                    ) : (
-                      <Lightbulb className="text-yellow-500" size={20} />
-                    )}
+                    <Sparkles className="text-purple-500" size={20} />
                   </div>
                 </div>
                 
@@ -373,7 +262,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                     {recipe.tags.slice(0, 3).map((tag, index) => (
                       <span
                         key={index}
-                        className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
+                        className="px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded-full"
                       >
                         {tag}
                       </span>
@@ -381,32 +270,30 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
                   </div>
                 )}
 
-                {/* Save Recipe Button - only show for AI generated or mock recipes */}
-                {isAIGenerated(recipe) && (
-                  <button
-                    onClick={() => saveRecipeToCollection(recipe)}
-                    disabled={savingRecipeId === recipe.id || isRecipeSaved(recipe)}
-                    className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                      isRecipeSaved(recipe)
-                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-                        : savingRecipeId === recipe.id
-                        ? 'bg-gray-400 text-white cursor-not-allowed'
-                        : 'bg-green-500 text-white hover:bg-green-600'
-                    }`}
-                  >
-                    {isRecipeSaved(recipe) ? (
-                      <>
-                        <Check size={16} />
-                        Sudah Disimpan
-                      </>
-                    ) : (
-                      <>
-                        <Save size={16} />
-                        {savingRecipeId === recipe.id ? 'Menyimpan...' : 'Simpan Resep'}
-                      </>
-                    )}
-                  </button>
-                )}
+                {/* Save Recipe Button - only show for AI generated recipes */}
+                <button
+                  onClick={() => saveRecipeToCollection(recipe)}
+                  disabled={savingRecipeId === recipe.id || isRecipeSaved(recipe)}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                    isRecipeSaved(recipe)
+                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                      : savingRecipeId === recipe.id
+                      ? 'bg-gray-400 text-white cursor-not-allowed'
+                      : 'bg-green-500 text-white hover:bg-green-600'
+                  }`}
+                >
+                  {isRecipeSaved(recipe) ? (
+                    <>
+                      <Check size={16} />
+                      Sudah Disimpan
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      {savingRecipeId === recipe.id ? 'Menyimpan...' : 'Simpan Resep'}
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           ))}
@@ -416,7 +303,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
       {suggestions.length === 0 && !isLoading && ingredients.length > 0 && !error && (
         <div className="text-center py-12">
           <ChefHat size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">Tidak ada saran resep ditemukan. Coba buat saran resep!</p>
+          <p className="text-gray-500">Klik "Buat Saran AI" untuk mendapatkan resep pintar berdasarkan bahan Anda!</p>
         </div>
       )}
     </div>
