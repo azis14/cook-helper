@@ -5,6 +5,7 @@ import { IngredientManager } from './components/IngredientManager';
 import { RecipeManager } from './components/RecipeManager';
 import { RecipeSuggestions } from './components/RecipeSuggestions';
 import { DatasetRecommendations } from './components/DatasetRecommendations';
+import { RAGRecommendations } from './components/RAGRecommendations';
 import { WeeklyPlanner } from './components/WeeklyPlanner';
 import { AuthForm } from './components/AuthForm';
 import { Toast } from './components/Toast';
@@ -44,6 +45,14 @@ function App() {
       case 'dataset':
         return (
           <DatasetRecommendations
+            ingredients={ingredients}
+            showSuccess={showSuccess}
+            showError={showError}
+          />
+        );
+      case 'rag':
+        return (
+          <RAGRecommendations
             ingredients={ingredients}
             showSuccess={showSuccess}
             showError={showError}
