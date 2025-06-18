@@ -85,14 +85,20 @@ class RAGRecipeService {
    */
   private async generateMissingEmbeddings(): Promise<void> {
     try {
-      // Get recipes that don't have embeddings yet
-      const { data: recipesWithoutEmbeddings, error } = await supabase
+      // Build the query for recipes that don't have embeddings yet
+      let query = supabase
         .from('dataset_recipes')
         .select('id, title, ingredients, steps')
         .is('user_id', null)
-        .gte('loves_count', 50)
-        .not('id', 'in', `(${Array.from(this.embeddingCache.keys()).map(id => `'${id}'`).join(',') || "''"})`)
-        .limit(100); // Process in batches
+        .gte('loves_count', 50);
+
+      // Only apply the 'not in' filter if we have cached embeddings
+      const cachedIds = Array.from(this.embeddingCache.keys());
+      if (cachedIds.length > 0) {
+        query = query.not('id', 'in', `(${cachedIds.map(id => `'${id}'`).join(',')})`);
+      }
+
+      const { data: recipesWithoutEmbeddings, error } = await query.limit(100);
 
       if (error) throw error;
 
