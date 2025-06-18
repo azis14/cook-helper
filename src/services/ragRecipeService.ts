@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { Ingredient, Recipe } from '../types';
 import EmbeddingService from './embeddingService';
+import GeminiService from './geminiService';
 
 export interface RAGRecipeRecommendation extends Recipe {
   loves_count: number;
@@ -27,10 +28,17 @@ export interface RecipeEmbedding {
 
 class RAGRecipeService {
   private embeddingService: EmbeddingService;
+  private geminiService: GeminiService | null = null;
   private isInitialized = false;
 
   constructor() {
     this.embeddingService = new EmbeddingService();
+    
+    // Initialize Gemini service if API key is available
+    const apiKey = import.meta.env.VITE_GOOGLE_AI_API_KEY;
+    if (apiKey) {
+      this.geminiService = new GeminiService(apiKey);
+    }
   }
 
   /**
@@ -91,7 +99,7 @@ class RAGRecipeService {
         query_embedding: queryEmbedding,
         min_loves: minLoves,
         similarity_threshold: minSimilarity,
-        match_count: maxResults
+        match_count: maxResults * 2 // Get more results to process with AI
       });
 
       if (error) {
@@ -105,10 +113,16 @@ class RAGRecipeService {
         return [];
       }
 
-      // Convert to recommendations
-      const recommendations = similarRecipes.map((result: any) => 
-        this.convertToRecommendation(result, ingredients)
-      );
+      // Process results with AI if available, otherwise use traditional conversion
+      let recommendations: RAGRecipeRecommendation[];
+      
+      if (this.geminiService) {
+        recommendations = await this.processWithAI(similarRecipes, ingredients, maxResults);
+      } else {
+        recommendations = similarRecipes
+          .slice(0, maxResults)
+          .map((result: any) => this.convertToRecommendation(result, ingredients));
+      }
 
       console.log(`Found ${recommendations.length} RAG recommendations`);
       return recommendations;
@@ -117,6 +131,179 @@ class RAGRecipeService {
       // Fallback to traditional method
       return this.getFallbackRecommendations(ingredients, options);
     }
+  }
+
+  /**
+   * Process vector search results with AI to ensure proper format and quality
+   */
+  private async processWithAI(
+    vectorResults: any[],
+    userIngredients: Ingredient[],
+    maxResults: number
+  ): Promise<RAGRecipeRecommendation[]> {
+    try {
+      const ingredientList = userIngredients.map(ing => 
+        `${ing.name} (${ing.quantity} ${ing.unit})`
+      ).join(', ');
+
+      // Prepare recipe references for AI
+      const recipeReferences = vectorResults.slice(0, Math.min(vectorResults.length, 8)).map((result, index) => ({
+        index: index + 1,
+        title: result.title,
+        ingredients: result.ingredients,
+        steps: result.steps,
+        loves_count: result.loves_count,
+        similarity_score: result.similarity_score
+      }));
+
+      const prompt = `
+Saya memiliki bahan-bahan berikut: ${ingredientList}
+
+Berdasarkan hasil pencarian vektor berikut, tolong pilih dan format ${maxResults} resep terbaik yang paling cocok dengan bahan saya. Berikan respon dalam format JSON yang valid dengan struktur berikut:
+
+REFERENSI RESEP DARI DATABASE:
+${recipeReferences.map(ref => `
+${ref.index}. ${ref.title} (${ref.loves_count} likes, ${Math.round(ref.similarity_score * 100)}% similarity)
+   Bahan: ${ref.ingredients.substring(0, 200)}...
+   Langkah: ${ref.steps.substring(0, 200)}...
+`).join('\n')}
+
+\`\`\`json
+{
+  "recipes": [
+    {
+      "referenceIndex": 1,
+      "name": "Nama Resep yang Diperbaiki",
+      "description": "Deskripsi singkat yang menarik",
+      "ingredients": [
+        {
+          "name": "nama bahan",
+          "quantity": 1,
+          "unit": "satuan"
+        }
+      ],
+      "instructions": [
+        "Langkah 1 yang jelas",
+        "Langkah 2 yang jelas"
+      ],
+      "prepTime": 15,
+      "cookTime": 30,
+      "servings": 4,
+      "difficulty": "easy",
+      "tags": ["tag1", "tag2"],
+      "relevanceReasons": [
+        "Alasan mengapa resep ini cocok",
+        "Alasan kedua"
+      ]
+    }
+  ]
+}
+\`\`\`
+
+Pastikan:
+1. Pilih resep dengan similarity score tertinggi dan paling cocok dengan bahan yang tersedia
+2. Perbaiki nama resep agar lebih menarik dan jelas
+3. Buat deskripsi yang menarik dan informatif
+4. Parsing bahan dengan benar dari teks mentah ke format terstruktur
+5. Buat instruksi yang jelas dan mudah diikuti dari langkah mentah
+6. Estimasi waktu yang realistis
+7. Tentukan tingkat kesulitan yang sesuai
+8. Berikan alasan relevansi yang spesifik
+9. JSON format yang valid tanpa komentar
+10. Urutkan berdasarkan kesesuaian dengan bahan yang tersedia
+`;
+
+      const result = await this.geminiService!.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      // Extract JSON from markdown code block
+      const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+      if (!jsonMatch || !jsonMatch[1]) {
+        console.warn('AI response format was unexpected, falling back to traditional method');
+        return vectorResults
+          .slice(0, maxResults)
+          .map((result: any) => this.convertToRecommendation(result, userIngredients));
+      }
+
+      try {
+        const parsedResponse = JSON.parse(jsonMatch[1]);
+        return this.convertAIResponseToRecommendations(parsedResponse, vectorResults, userIngredients);
+      } catch (parseError) {
+        console.error('JSON parsing error:', parseError);
+        console.error('Attempted to parse:', jsonMatch[1]);
+        // Fallback to traditional method
+        return vectorResults
+          .slice(0, maxResults)
+          .map((result: any) => this.convertToRecommendation(result, userIngredients));
+      }
+    } catch (error) {
+      console.error('Error processing with AI:', error);
+      // Fallback to traditional method
+      return vectorResults
+        .slice(0, maxResults)
+        .map((result: any) => this.convertToRecommendation(result, userIngredients));
+    }
+  }
+
+  /**
+   * Convert AI-processed response to our recommendation format
+   */
+  private convertAIResponseToRecommendations(
+    aiResponse: any,
+    originalResults: any[],
+    userIngredients: Ingredient[]
+  ): RAGRecipeRecommendation[] {
+    if (!aiResponse.recipes || !Array.isArray(aiResponse.recipes)) {
+      throw new Error('Invalid AI response format');
+    }
+
+    return aiResponse.recipes.map((aiRecipe: any, index: number) => {
+      // Find the original result this AI recipe is based on
+      const referenceIndex = aiRecipe.referenceIndex - 1;
+      const originalResult = originalResults[referenceIndex] || originalResults[index] || originalResults[0];
+      
+      if (!originalResult) {
+        throw new Error(`No original result found for AI recipe ${index}`);
+      }
+
+      // Calculate confidence score based on AI processing and original similarity
+      const confidenceScore = this.calculateConfidenceScore(
+        originalResult.similarity_score,
+        originalResult.loves_count,
+        aiRecipe.ingredients?.length || 5,
+        aiRecipe.instructions?.length || 5
+      );
+
+      return {
+        id: originalResult.id,
+        name: aiRecipe.name || originalResult.title,
+        description: aiRecipe.description || originalResult.title,
+        prep_time: aiRecipe.prepTime || 15,
+        cook_time: aiRecipe.cookTime || 30,
+        servings: aiRecipe.servings || 4,
+        difficulty: aiRecipe.difficulty || 'medium',
+        instructions: aiRecipe.instructions || this.parseSteps(originalResult.steps),
+        tags: aiRecipe.tags || this.extractSemanticTags(originalResult.title, originalResult.ingredients, originalResult.similarity_score),
+        user_id: 'dataset-rag-ai',
+        recipe_ingredients: (aiRecipe.ingredients || []).map((ing: any, ingIndex: number) => ({
+          id: `${originalResult.id}-ai-ing-${ingIndex}`,
+          recipe_id: originalResult.id,
+          name: ing.name,
+          quantity: ing.quantity || 1,
+          unit: ing.unit || 'secukupnya',
+        })),
+        loves_count: originalResult.loves_count,
+        similarity_score: originalResult.similarity_score,
+        relevance_reasons: aiRecipe.relevanceReasons || this.generateRelevanceReasons(
+          { recipe: originalResult, similarity: originalResult.similarity_score },
+          userIngredients,
+          (aiRecipe.ingredients || []).map((ing: any) => ing.name)
+        ),
+        source_url: originalResult.url,
+        confidence_score: confidenceScore,
+      };
+    });
   }
 
   /**
@@ -194,7 +381,7 @@ class RAGRecipeService {
       const { data: similarRecipes, error } = await supabase.rpc('search_recipes_by_text', {
         query_embedding: queryEmbedding,
         similarity_threshold: minSimilarity,
-        match_count: maxResults
+        match_count: maxResults * 2
       });
 
       if (error) {
@@ -204,12 +391,92 @@ class RAGRecipeService {
 
       if (!similarRecipes) return [];
 
-      return similarRecipes.map((result: any) => 
-        this.convertToRecommendation(result, [])
-      );
+      // Process with AI if available
+      if (this.geminiService && similarRecipes.length > 0) {
+        return this.processSemanticSearchWithAI(similarRecipes, query, maxResults);
+      }
+
+      return similarRecipes
+        .slice(0, maxResults)
+        .map((result: any) => this.convertToRecommendation(result, []));
     } catch (error) {
       console.error('Error in semantic search:', error);
       return this.getFallbackSemanticSearch(query, options);
+    }
+  }
+
+  /**
+   * Process semantic search results with AI
+   */
+  private async processSemanticSearchWithAI(
+    vectorResults: any[],
+    query: string,
+    maxResults: number
+  ): Promise<RAGRecipeRecommendation[]> {
+    try {
+      const recipeReferences = vectorResults.slice(0, Math.min(vectorResults.length, 6)).map((result, index) => ({
+        index: index + 1,
+        title: result.title,
+        ingredients: result.ingredients,
+        steps: result.steps,
+        loves_count: result.loves_count,
+        similarity_score: result.similarity_score
+      }));
+
+      const prompt = `
+Berdasarkan pencarian "${query}", tolong pilih dan format ${maxResults} resep terbaik dari hasil berikut:
+
+REFERENSI RESEP:
+${recipeReferences.map(ref => `
+${ref.index}. ${ref.title} (${ref.loves_count} likes, ${Math.round(ref.similarity_score * 100)}% similarity)
+   Bahan: ${ref.ingredients.substring(0, 200)}...
+   Langkah: ${ref.steps.substring(0, 200)}...
+`).join('\n')}
+
+Format dalam JSON yang sama seperti sebelumnya, fokus pada resep yang paling relevan dengan pencarian "${query}".
+
+\`\`\`json
+{
+  "recipes": [
+    {
+      "referenceIndex": 1,
+      "name": "Nama Resep",
+      "description": "Deskripsi menarik",
+      "ingredients": [...],
+      "instructions": [...],
+      "prepTime": 15,
+      "cookTime": 30,
+      "servings": 4,
+      "difficulty": "easy",
+      "tags": [...],
+      "relevanceReasons": [
+        "Relevan dengan pencarian '${query}'",
+        "Alasan lainnya"
+      ]
+    }
+  ]
+}
+\`\`\`
+`;
+
+      const result = await this.geminiService!.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+      if (!jsonMatch || !jsonMatch[1]) {
+        return vectorResults
+          .slice(0, maxResults)
+          .map((result: any) => this.convertToRecommendation(result, []));
+      }
+
+      const parsedResponse = JSON.parse(jsonMatch[1]);
+      return this.convertAIResponseToRecommendations(parsedResponse, vectorResults, []);
+    } catch (error) {
+      console.error('Error processing semantic search with AI:', error);
+      return vectorResults
+        .slice(0, maxResults)
+        .map((result: any) => this.convertToRecommendation(result, []));
     }
   }
 

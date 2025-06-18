@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, Zap, TrendingUp, Search, Filter, Star, Clock, Users, ChefHat, Target, RefreshCw } from 'lucide-react';
+import { Brain, Zap, TrendingUp, Search, Filter, Star, Clock, Users, ChefHat, Target, RefreshCw, Sparkles } from 'lucide-react';
 import RAGRecipeService, { RAGRecipeRecommendation } from '../services/ragRecipeService';
 import { Ingredient } from '../types';
 import { RecipeDetailModal } from './RecipeDetailModal';
@@ -147,6 +147,10 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
     return <Zap className="text-yellow-500" size={16} />;
   };
 
+  const isAIProcessed = (recipe: RAGRecipeRecommendation) => {
+    return recipe.user_id === 'dataset-rag-ai';
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -156,7 +160,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
             RAG Recipe Intelligence
           </h2>
           <p className="text-gray-600 mt-1">
-            Rekomendasi resep menggunakan AI semantik dan embedding
+            Rekomendasi resep menggunakan AI semantik dan embedding dengan pemrosesan AI
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -181,11 +185,11 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
       <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
         <div className="flex items-center gap-3 mb-2">
           <Brain className="text-purple-600" size={20} />
-          <h3 className="font-semibold text-gray-900">Sistem RAG dengan Background Sync</h3>
+          <h3 className="font-semibold text-gray-900">Sistem RAG dengan AI Processing</h3>
         </div>
         <p className="text-sm text-gray-700 mb-2">
           Menggunakan semantic embeddings untuk menemukan resep yang paling relevan dengan bahan Anda. 
-          Sistem ini memahami konteks dan makna, bukan hanya pencocokan kata kunci.
+          Hasil pencarian diproses dengan AI untuk memastikan format dan kualitas yang optimal.
         </p>
         <p className="text-xs text-gray-600">
           💡 Embeddings diperbarui secara otomatis di background menggunakan cron job untuk performa optimal.
@@ -279,7 +283,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
       {isLoading && (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">AI sedang menganalisis dan mencari resep yang paling relevan...</p>
+          <p className="text-gray-600">AI sedang menganalisis dan memproses resep yang paling relevan...</p>
         </div>
       )}
 
@@ -310,10 +314,23 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
                     <span className="text-xs font-medium text-gray-600">
                       {Math.round(recipe.confidence_score * 100)}%
                     </span>
+                    {isAIProcessed(recipe) && (
+                      <Sparkles className="text-purple-500 ml-1" size={14} />
+                    )}
                   </div>
                 </div>
                 
                 <p className="text-sm text-gray-600 mb-3 line-clamp-2">{recipe.description}</p>
+                
+                {/* AI Processing Badge */}
+                {isAIProcessed(recipe) && (
+                  <div className="mb-3">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">
+                      <Sparkles size={12} />
+                      Diproses AI
+                    </span>
+                  </div>
+                )}
                 
                 {/* Similarity Score */}
                 <div className="flex items-center justify-between mb-3">

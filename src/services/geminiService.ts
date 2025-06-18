@@ -100,6 +100,13 @@ Pastikan:
     }
   }
 
+  /**
+   * Generate content using Gemini AI - exposed for use by other services
+   */
+  async generateContent(prompt: string): Promise<any> {
+    return await this.model.generateContent(prompt);
+  }
+
   private convertToRecipeFormat(parsedResponse: any): Recipe[] {
     // Convert to Recipe format
     const recipes: Recipe[] = parsedResponse.recipes.map((recipe: GeminiRecipeSuggestion, index: number) => ({
