@@ -45,6 +45,11 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
     gelas: 'gelas',
   };
 
+  // Helper function to check if a recipe is AI-generated
+  const isAIGenerated = (recipe: Recipe) => {
+    return recipe.user_id === 'ai-generated' || recipe.id.startsWith('mock-') || recipe.id.startsWith('gemini-');
+  };
+
   // Load saved suggestions from localStorage on component mount
   useEffect(() => {
     const savedSuggestions = localStorage.getItem('recipe-suggestions');
@@ -52,7 +57,10 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
     
     if (savedSuggestions) {
       try {
-        setSuggestions(JSON.parse(savedSuggestions));
+        const allSavedSuggestions = JSON.parse(savedSuggestions);
+        // Filter to only show AI-generated recipes
+        const aiOnlySuggestions = allSavedSuggestions.filter((recipe: Recipe) => isAIGenerated(recipe));
+        setSuggestions(aiOnlySuggestions);
       } catch (err) {
         console.error('Error parsing saved suggestions:', err);
       }
@@ -143,10 +151,6 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
     } finally {
       setSavingRecipeId(null);
     }
-  };
-
-  const isAIGenerated = (recipe: Recipe) => {
-    return recipe.user_id === 'ai-generated' || recipe.id.startsWith('mock-') || recipe.id.startsWith('gemini-');
   };
 
   const isRecipeSaved = (recipe: Recipe) => {
