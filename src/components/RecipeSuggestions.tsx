@@ -161,7 +161,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Saran Resep AI</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Inspirasi Resep AI</h2>
           <p className="text-gray-600 mt-1">Resep pintar berdasarkan bahan yang tersedia</p>
         </div>
         <button
