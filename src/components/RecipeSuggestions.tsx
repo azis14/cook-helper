@@ -170,7 +170,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
           className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           <Sparkles size={18} className={isLoading ? 'animate-spin' : ''} />
-          {isLoading ? 'Sedang membuat...' : 'Buat Saran AI'}
+          {isLoading ? 'Sedang membuat...' : 'Buat Inspirasi AI'}
         </button>
       </div>
 
