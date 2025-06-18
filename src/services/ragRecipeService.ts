@@ -28,140 +28,37 @@ export interface RecipeEmbedding {
 class RAGRecipeService {
   private embeddingService: EmbeddingService;
   private isInitialized = false;
-  private embeddingCache: Map<string, number[]> = new Map();
 
   constructor() {
     this.embeddingService = new EmbeddingService();
   }
 
   /**
-   * Initialize the service by ensuring all recipes have embeddings in the database
+   * Initialize the service - now just checks if embeddings exist
+   * Background sync handles the heavy lifting
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
-      console.log('Initializing RAG Recipe Service with Supabase vector storage...');
+      console.log('Initializing RAG Recipe Service...');
       
-      // Load existing embeddings from database into cache
-      await this.loadEmbeddingsFromDatabase();
-      
-      // Check for recipes without embeddings and generate them
-      await this.generateMissingEmbeddings();
-
-      this.isInitialized = true;
-      console.log(`RAG Recipe Service initialized with ${this.embeddingCache.size} cached embeddings`);
-    } catch (error) {
-      console.error('Error initializing RAG Recipe Service:', error);
-      // Continue with limited functionality
-      this.isInitialized = true;
-    }
-  }
-
-  /**
-   * Load existing embeddings from Supabase into local cache
-   */
-  private async loadEmbeddingsFromDatabase(): Promise<void> {
-    try {
-      const { data: embeddings, error } = await supabase
+      // Just check if we have embeddings available
+      const { data: embeddingCount, error } = await supabase
         .from('recipe_embeddings')
-        .select('recipe_id, embedding');
-
-      if (error) throw error;
-
-      if (embeddings) {
-        embeddings.forEach(embedding => {
-          this.embeddingCache.set(embedding.recipe_id, embedding.embedding);
-        });
-        console.log(`Loaded ${embeddings.length} embeddings from database`);
-      }
-    } catch (error) {
-      console.error('Error loading embeddings from database:', error);
-    }
-  }
-
-  /**
-   * Generate embeddings for recipes that don't have them yet
-   */
-  private async generateMissingEmbeddings(): Promise<void> {
-    try {
-      // Build the query for recipes that don't have embeddings yet
-      let query = supabase
-        .from('dataset_recipes')
-        .select('id, title, ingredients, steps')
-        .is('user_id', null)
-        .gte('loves_count', 50);
-
-      // Only apply the 'not in' filter if we have cached embeddings
-      const cachedIds = Array.from(this.embeddingCache.keys());
-      if (cachedIds.length > 0) {
-        query = query.not('id', 'in', `(${cachedIds.map(id => `'${id}'`).join(',')})`);
-      }
-
-      const { data: recipesWithoutEmbeddings, error } = await query.limit(100);
-
-      if (error) throw error;
-
-      if (!recipesWithoutEmbeddings || recipesWithoutEmbeddings.length === 0) {
-        console.log('All recipes already have embeddings');
-        return;
-      }
-
-      console.log(`Generating embeddings for ${recipesWithoutEmbeddings.length} recipes...`);
-
-      // Process recipes in smaller batches to avoid overwhelming the system
-      const batchSize = 10;
-      for (let i = 0; i < recipesWithoutEmbeddings.length; i += batchSize) {
-        const batch = recipesWithoutEmbeddings.slice(i, i + batchSize);
-        await this.processBatchWithDatabase(batch);
-        
-        // Add delay between batches
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-    } catch (error) {
-      console.error('Error generating missing embeddings:', error);
-    }
-  }
-
-  /**
-   * Process a batch of recipes and store embeddings in database
-   */
-  private async processBatchWithDatabase(recipes: any[]): Promise<void> {
-    const embeddingsToInsert = [];
-
-    for (const recipe of recipes) {
-      try {
-        const content = this.embeddingService.createRecipeContent(recipe);
-        const embedding = await this.embeddingService.generateEmbedding(content);
-        
-        // Add to cache
-        this.embeddingCache.set(recipe.id, embedding);
-        
-        // Prepare for database insertion
-        embeddingsToInsert.push({
-          recipe_id: recipe.id,
-          embedding: embedding,
-          content: content
-        });
-      } catch (error) {
-        console.error(`Error processing recipe ${recipe.id}:`, error);
-      }
-    }
-
-    // Insert embeddings into database
-    if (embeddingsToInsert.length > 0) {
-      const { error } = await supabase
-        .from('recipe_embeddings')
-        .upsert(embeddingsToInsert, { 
-          onConflict: 'recipe_id',
-          ignoreDuplicates: false 
-        });
+        .select('id', { count: 'exact', head: true });
 
       if (error) {
-        console.error('Error inserting embeddings:', error);
+        console.warn('Could not check embedding count:', error);
       } else {
-        console.log(`Inserted ${embeddingsToInsert.length} embeddings into database`);
+        console.log(`Found ${embeddingCount?.length || 0} embeddings in database`);
       }
+
+      this.isInitialized = true;
+      console.log('RAG Recipe Service initialized successfully');
+    } catch (error) {
+      console.error('Error initializing RAG Recipe Service:', error);
+      this.isInitialized = true; // Continue with limited functionality
     }
   }
 
@@ -199,11 +96,12 @@ class RAGRecipeService {
 
       if (error) {
         console.error('Vector search error:', error);
-        // Fallback to traditional method
+        // Fallback to traditional method if vector search fails
         return this.getFallbackRecommendations(ingredients, options);
       }
 
       if (!similarRecipes || similarRecipes.length === 0) {
+        console.log('No similar recipes found with vector search');
         return [];
       }
 
@@ -212,6 +110,7 @@ class RAGRecipeService {
         this.convertToRecommendation(result, ingredients)
       );
 
+      console.log(`Found ${recommendations.length} RAG recommendations`);
       return recommendations;
     } catch (error) {
       console.error('Error getting RAG recommendations:', error);
@@ -231,53 +130,43 @@ class RAGRecipeService {
       minSimilarity?: number;
     }
   ): Promise<RAGRecipeRecommendation[]> {
-    const { minLoves = 50, maxResults = 12, minSimilarity = 0.3 } = options;
+    console.log('Using fallback recommendation method');
+    
+    const { minLoves = 50, maxResults = 12 } = options;
 
     try {
-      const queryContent = this.embeddingService.createQueryContent(ingredients);
-      const queryEmbedding = await this.embeddingService.generateEmbedding(queryContent);
-
+      // Simple fallback: get popular recipes and do basic ingredient matching
       const { data: recipes, error } = await supabase
         .from('dataset_recipes')
         .select('*')
         .is('user_id', null)
         .gte('loves_count', minLoves)
         .order('loves_count', { ascending: false })
-        .limit(200);
+        .limit(maxResults * 2); // Get more to filter
 
       if (error) throw error;
       if (!recipes) return [];
 
-      const contexts: RecipeContext[] = [];
+      const userIngredientNames = ingredients.map(ing => ing.name.toLowerCase());
+      
+      // Simple text-based matching as fallback
+      const matchedRecipes = recipes
+        .map(recipe => {
+          const ingredientsText = recipe.ingredients.toLowerCase();
+          const matchCount = userIngredientNames.filter(userIng => 
+            ingredientsText.includes(userIng)
+          ).length;
+          
+          return {
+            ...recipe,
+            similarity_score: matchCount / Math.max(userIngredientNames.length, 1)
+          };
+        })
+        .filter(recipe => recipe.similarity_score > 0)
+        .sort((a, b) => b.similarity_score - a.similarity_score)
+        .slice(0, maxResults);
 
-      for (const recipe of recipes) {
-        let recipeEmbedding = this.embeddingCache.get(recipe.id);
-        
-        if (!recipeEmbedding) {
-          const content = this.embeddingService.createRecipeContent(recipe);
-          recipeEmbedding = await this.embeddingService.generateEmbedding(content);
-          this.embeddingCache.set(recipe.id, recipeEmbedding);
-        }
-
-        const similarity = this.embeddingService.calculateSimilarity(
-          queryEmbedding,
-          recipeEmbedding
-        );
-
-        if (similarity >= minSimilarity) {
-          contexts.push({
-            recipe,
-            content: this.embeddingService.createRecipeContent(recipe),
-            embedding: recipeEmbedding,
-            similarity
-          });
-        }
-      }
-
-      return contexts
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, maxResults)
-        .map(context => this.convertToRecommendation(context, ingredients));
+      return matchedRecipes.map(recipe => this.convertToRecommendation(recipe, ingredients));
     } catch (error) {
       console.error('Error in fallback recommendations:', error);
       return [];
@@ -310,7 +199,6 @@ class RAGRecipeService {
 
       if (error) {
         console.error('Semantic search error:', error);
-        // Fallback to traditional search
         return this.getFallbackSemanticSearch(query, options);
       }
 
@@ -332,54 +220,48 @@ class RAGRecipeService {
     query: string,
     options: { maxResults?: number; minSimilarity?: number }
   ): Promise<RAGRecipeRecommendation[]> {
-    const { maxResults = 10, minSimilarity = 0.4 } = options;
+    const { maxResults = 10 } = options;
 
     try {
-      const queryEmbedding = await this.embeddingService.generateEmbedding(query);
-
+      // Simple text search as fallback
       const { data: recipes, error } = await supabase
         .from('dataset_recipes')
         .select('*')
         .is('user_id', null)
+        .or(`title.ilike.%${query}%,ingredients.ilike.%${query}%`)
         .order('loves_count', { ascending: false })
-        .limit(200);
+        .limit(maxResults);
 
       if (error) throw error;
       if (!recipes) return [];
 
-      const contexts: RecipeContext[] = [];
-
-      for (const recipe of recipes) {
-        let recipeEmbedding = this.embeddingCache.get(recipe.id);
-        
-        if (!recipeEmbedding) {
-          const content = this.embeddingService.createRecipeContent(recipe);
-          recipeEmbedding = await this.embeddingService.generateEmbedding(content);
-          this.embeddingCache.set(recipe.id, recipeEmbedding);
-        }
-
-        const similarity = this.embeddingService.calculateSimilarity(
-          queryEmbedding,
-          recipeEmbedding
-        );
-
-        if (similarity >= minSimilarity) {
-          contexts.push({
-            recipe,
-            content: this.embeddingService.createRecipeContent(recipe),
-            embedding: recipeEmbedding,
-            similarity
-          });
-        }
-      }
-
-      return contexts
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, maxResults)
-        .map(context => this.convertToRecommendation(context, []));
+      return recipes.map(recipe => this.convertToRecommendation({
+        ...recipe,
+        similarity_score: 0.5 // Default similarity for text search
+      }, []));
     } catch (error) {
       console.error('Error in fallback semantic search:', error);
       return [];
+    }
+  }
+
+  /**
+   * Trigger background embedding sync manually (for testing)
+   */
+  async triggerBackgroundSync(): Promise<{ success: boolean; message: string }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-embeddings');
+      
+      if (error) {
+        console.error('Background sync error:', error);
+        return { success: false, message: error.message };
+      }
+
+      console.log('Background sync result:', data);
+      return { success: true, message: 'Background sync completed successfully' };
+    } catch (error) {
+      console.error('Error triggering background sync:', error);
+      return { success: false, message: 'Failed to trigger background sync' };
     }
   }
 
@@ -455,7 +337,7 @@ class RAGRecipeService {
       reasons.push(`Sangat cocok dengan bahan Anda (${similarityPercent}% kemiripan)`);
     } else if (similarityPercent >= 50) {
       reasons.push(`Cocok dengan bahan Anda (${similarityPercent}% kemiripan)`);
-    } else {
+    } else if (similarityPercent > 0) {
       reasons.push(`Relevan dengan bahan Anda (${similarityPercent}% kemiripan)`);
     }
 
@@ -467,15 +349,17 @@ class RAGRecipeService {
     }
 
     // Ingredient matching (traditional approach as backup)
-    const userIngredientNames = userIngredients.map(ing => ing.name.toLowerCase());
-    const matchingIngredients = recipeIngredients.filter(recipeIng =>
-      userIngredientNames.some(userIng =>
-        recipeIng.toLowerCase().includes(userIng) || userIng.includes(recipeIng.toLowerCase())
-      )
-    );
+    if (userIngredients.length > 0) {
+      const userIngredientNames = userIngredients.map(ing => ing.name.toLowerCase());
+      const matchingIngredients = recipeIngredients.filter(recipeIng =>
+        userIngredientNames.some(userIng =>
+          recipeIng.toLowerCase().includes(userIng) || userIng.includes(recipeIng.toLowerCase())
+        )
+      );
 
-    if (matchingIngredients.length > 0) {
-      reasons.push(`Menggunakan bahan yang Anda miliki: ${matchingIngredients.slice(0, 3).join(', ')}`);
+      if (matchingIngredients.length > 0) {
+        reasons.push(`Menggunakan bahan yang Anda miliki: ${matchingIngredients.slice(0, 3).join(', ')}`);
+      }
     }
 
     // Complexity reason

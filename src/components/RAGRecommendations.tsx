@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, Zap, TrendingUp, Search, Filter, Star, Clock, Users, ChefHat, Target } from 'lucide-react';
+import { Brain, Zap, TrendingUp, Search, Filter, Star, Clock, Users, ChefHat, Target, RefreshCw } from 'lucide-react';
 import RAGRecipeService, { RAGRecipeRecommendation } from '../services/ragRecipeService';
 import { Ingredient } from '../types';
 import { RecipeDetailModal } from './RecipeDetailModal';
@@ -19,6 +19,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
   const [recommendations, setRecommendations] = useState<RAGRecipeRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<RAGRecipeRecommendation | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -111,6 +112,23 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
     }
   };
 
+  const handleBackgroundSync = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await ragService.triggerBackgroundSync();
+      if (result.success) {
+        showSuccess('Sinkronisasi embedding berhasil dijalankan!');
+      } else {
+        showError(`Gagal menjalankan sinkronisasi: ${result.message}`);
+      }
+    } catch (error) {
+      showError('Gagal menjalankan sinkronisasi embedding');
+      console.error('Background sync error:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleCardClick = (recipe: RAGRecipeRecommendation) => {
     setSelectedRecipe(recipe);
     setShowDetailModal(true);
@@ -141,23 +159,36 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
             Rekomendasi resep menggunakan AI semantik dan embedding
           </p>
         </div>
-        {isInitializing && (
-          <div className="flex items-center gap-2 text-purple-600">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
-            <span className="text-sm">Menginisialisasi AI...</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {isInitializing && (
+            <div className="flex items-center gap-2 text-purple-600">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+              <span className="text-sm">Menginisialisasi AI...</span>
+            </div>
+          )}
+          <button
+            onClick={handleBackgroundSync}
+            disabled={isSyncing}
+            className="flex items-center gap-2 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
+          >
+            <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+            {isSyncing ? 'Sinkronisasi...' : 'Sync Embeddings'}
+          </button>
+        </div>
       </div>
 
       {/* RAG Status & Info */}
       <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
         <div className="flex items-center gap-3 mb-2">
           <Brain className="text-purple-600" size={20} />
-          <h3 className="font-semibold text-gray-900">Sistem RAG Aktif</h3>
+          <h3 className="font-semibold text-gray-900">Sistem RAG dengan Background Sync</h3>
         </div>
-        <p className="text-sm text-gray-700">
+        <p className="text-sm text-gray-700 mb-2">
           Menggunakan semantic embeddings untuk menemukan resep yang paling relevan dengan bahan Anda. 
           Sistem ini memahami konteks dan makna, bukan hanya pencocokan kata kunci.
+        </p>
+        <p className="text-xs text-gray-600">
+          💡 Embeddings diperbarui secara otomatis di background menggunakan cron job untuk performa optimal.
         </p>
       </div>
 
