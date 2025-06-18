@@ -300,7 +300,7 @@ class RAGRecipeService {
     return {
       id: recipe.id,
       name: recipe.title,
-      description: `Resep dengan ${recipe.loves_count} likes - Tingkat kemiripan: ${Math.round(similarity * 100)}%`,
+      description: recipe.title, // Use title as description for cleaner format
       prep_time: estimatedPrepTime,
       cook_time: estimatedCookTime,
       servings: 4,
