@@ -114,6 +114,64 @@ export interface Database {
           created_at?: string
         }
       }
+      recipe_embeddings: {
+        Row: {
+          id: string
+          recipe_id: string
+          embedding: number[]
+          content: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          recipe_id: string
+          embedding: number[]
+          content: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          recipe_id?: string
+          embedding?: number[]
+          content?: string
+          created_at?: string
+        }
+      }
+      dataset_recipes: {
+        Row: {
+          id: string
+          title: string
+          ingredients: string
+          steps: string
+          loves_count: number
+          url: string | null
+          user_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          ingredients: string
+          steps: string
+          loves_count?: number
+          url?: string | null
+          user_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          ingredients?: string
+          steps?: string
+          loves_count?: number
+          url?: string | null
+          user_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       weekly_plans: {
         Row: {
           id: string
@@ -171,7 +229,39 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      find_similar_recipes: {
+        Args: {
+          query_embedding: number[]
+          min_loves?: number
+          similarity_threshold?: number
+          match_count?: number
+        }
+        Returns: {
+          id: string
+          title: string
+          ingredients: string
+          steps: string
+          loves_count: number
+          url: string | null
+          similarity_score: number
+        }[]
+      }
+      search_recipes_by_text: {
+        Args: {
+          query_embedding: number[]
+          similarity_threshold?: number
+          match_count?: number
+        }
+        Returns: {
+          id: string
+          title: string
+          ingredients: string
+          steps: string
+          loves_count: number
+          url: string | null
+          similarity_score: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
