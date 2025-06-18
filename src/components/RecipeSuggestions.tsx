@@ -307,7 +307,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
       {suggestions.length === 0 && !isLoading && ingredients.length > 0 && !error && (
         <div className="text-center py-12">
           <ChefHat size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">Klik "Buat Saran AI" untuk mendapatkan resep pintar berdasarkan bahan Anda!</p>
+          <p className="text-gray-500">Klik "Buat Inspirasi AI" untuk mendapatkan resep pintar berdasarkan bahan Anda!</p>
         </div>
       )}
     </div>
