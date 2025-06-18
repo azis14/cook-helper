@@ -183,7 +183,7 @@ export const RecipeSuggestions: React.FC<RecipeSuggestionsProps> = ({
       {ingredients.length === 0 && (
         <div className="text-center py-12">
           <Lightbulb size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">Tambahkan beberapa bahan terlebih dahulu untuk mendapatkan saran resep AI!</p>
+          <p className="text-gray-500">Tambahkan beberapa bahan terlebih dahulu untuk mendapatkan inspirasi resep AI!</p>
         </div>
       )}
 
