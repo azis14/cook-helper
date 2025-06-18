@@ -83,18 +83,17 @@ Pastikan:
       // Extract JSON from markdown code block
       const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
       if (!jsonMatch || !jsonMatch[1]) {
-        // Fallback to original regex if markdown format not found
-        const fallbackMatch = text.match(/\{[\s\S]*\}/);
-        if (!fallbackMatch) {
-          throw new Error('Invalid JSON response from Gemini');
-        }
-        
-        const parsedResponse = JSON.parse(fallbackMatch[0]);
-        return this.convertToRecipeFormat(parsedResponse);
+        throw new Error('AI response format was unexpected. Expected JSON wrapped in markdown code block.');
       }
 
-      const parsedResponse = JSON.parse(jsonMatch[1]);
-      return this.convertToRecipeFormat(parsedResponse);
+      try {
+        const parsedResponse = JSON.parse(jsonMatch[1]);
+        return this.convertToRecipeFormat(parsedResponse);
+      } catch (parseError) {
+        console.error('JSON parsing error:', parseError);
+        console.error('Attempted to parse:', jsonMatch[1]);
+        throw new Error('AI response contained invalid JSON format.');
+      }
     } catch (error) {
       console.error('Error generating recipe suggestions:', error);
       throw new Error('Gagal membuat saran resep dengan AI. Silakan coba lagi.');
@@ -154,17 +153,16 @@ Kelompokkan berdasarkan kategori (sayuran, daging, bumbu, dll) dan berikan dalam
 
       const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
       if (!jsonMatch || !jsonMatch[1]) {
-        // Fallback to original regex
-        const fallbackMatch = text.match(/\{[\s\S]*\}/);
-        if (!fallbackMatch) {
-          return [];
-        }
-        const parsedResponse = JSON.parse(fallbackMatch[0]);
-        return parsedResponse.shoppingList || [];
+        return [];
       }
 
-      const parsedResponse = JSON.parse(jsonMatch[1]);
-      return parsedResponse.shoppingList || [];
+      try {
+        const parsedResponse = JSON.parse(jsonMatch[1]);
+        return parsedResponse.shoppingList || [];
+      } catch (parseError) {
+        console.error('JSON parsing error in shopping list:', parseError);
+        return [];
+      }
     } catch (error) {
       console.error('Error generating shopping list:', error);
       return [];
@@ -193,17 +191,16 @@ Berikan 3-5 tips memasak untuk resep "${recipeName}" dalam format JSON yang dibu
 
       const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
       if (!jsonMatch || !jsonMatch[1]) {
-        // Fallback to original regex
-        const fallbackMatch = text.match(/\{[\s\S]*\}/);
-        if (!fallbackMatch) {
-          return [];
-        }
-        const parsedResponse = JSON.parse(fallbackMatch[0]);
-        return parsedResponse.tips || [];
+        return [];
       }
 
-      const parsedResponse = JSON.parse(jsonMatch[1]);
-      return parsedResponse.tips || [];
+      try {
+        const parsedResponse = JSON.parse(jsonMatch[1]);
+        return parsedResponse.tips || [];
+      } catch (parseError) {
+        console.error('JSON parsing error in cooking tips:', parseError);
+        return [];
+      }
     } catch (error) {
       console.error('Error getting cooking tips:', error);
       return [];
