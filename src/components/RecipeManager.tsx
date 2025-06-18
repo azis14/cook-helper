@@ -2,12 +2,16 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Edit, Clock, Users, ChefHat } from 'lucide-react';
 import { useRecipes } from '../hooks/useRecipes';
 import { useAuth } from '../hooks/useAuth';
+import { RecipeDetailModal } from './RecipeDetailModal';
+import { Recipe } from '../types';
 
 export const RecipeManager: React.FC = () => {
   const { user } = useAuth();
   const { recipes, loading, error, addRecipe, updateRecipe, deleteRecipe } = useRecipes(user?.id);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -106,6 +110,11 @@ export const RecipeManager: React.FC = () => {
         console.error('Error deleting recipe:', err);
       }
     }
+  };
+
+  const handleCardClick = (recipe: Recipe) => {
+    setSelectedRecipe(recipe);
+    setShowDetailModal(true);
   };
 
   const addInstruction = () => {
@@ -389,20 +398,27 @@ export const RecipeManager: React.FC = () => {
           {recipes.map((recipe) => (
             <div
               key={recipe.id}
-              className="bg-white rounded-lg shadow-md border border-green-100 overflow-hidden hover:shadow-lg transition-shadow"
+              className="bg-white rounded-lg shadow-md border border-green-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => handleCardClick(recipe)}
             >
               <div className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="font-semibold text-gray-900 text-lg">{recipe.name}</h3>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => handleEdit(recipe)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(recipe);
+                      }}
                       className="p-1 text-blue-600 hover:bg-blue-100 rounded"
                     >
                       <Edit size={14} />
                     </button>
                     <button
-                      onClick={() => handleDelete(recipe.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(recipe.id);
+                      }}
                       className="p-1 text-red-600 hover:bg-red-100 rounded"
                     >
                       <Trash2 size={14} />
@@ -434,10 +450,27 @@ export const RecipeManager: React.FC = () => {
                   <span className="font-medium">Bahan: </span>
                   {recipe.recipe_ingredients.length} item
                 </div>
+
+                {/* Click hint */}
+                <div className="mt-3 text-xs text-gray-400 text-center">
+                  Klik untuk melihat detail lengkap
+                </div>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {/* Recipe Detail Modal */}
+      {selectedRecipe && (
+        <RecipeDetailModal
+          recipe={selectedRecipe}
+          isOpen={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedRecipe(null);
+          }}
+        />
       )}
     </div>
   );
