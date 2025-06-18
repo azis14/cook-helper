@@ -4,6 +4,7 @@ import { Navigation } from './components/Navigation';
 import { IngredientManager } from './components/IngredientManager';
 import { RecipeManager } from './components/RecipeManager';
 import { RecipeSuggestions } from './components/RecipeSuggestions';
+import { DatasetRecommendations } from './components/DatasetRecommendations';
 import { WeeklyPlanner } from './components/WeeklyPlanner';
 import { AuthForm } from './components/AuthForm';
 import { Toast } from './components/Toast';
@@ -36,6 +37,14 @@ function App() {
           <RecipeSuggestions 
             ingredients={ingredients} 
             recipes={recipes}
+            showSuccess={showSuccess}
+            showError={showError}
+          />
+        );
+      case 'dataset':
+        return (
+          <DatasetRecommendations
+            ingredients={ingredients}
             showSuccess={showSuccess}
             showError={showError}
           />

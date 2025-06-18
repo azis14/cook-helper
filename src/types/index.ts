@@ -73,6 +73,24 @@ export interface ShoppingItem {
   needed: boolean;
 }
 
+export interface NutritionInfo {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  sugar: number;
+  sodium: number;
+}
+
+export interface DatasetRecipe extends Recipe {
+  rating: number;
+  rating_count: number;
+  nutrition?: NutritionInfo;
+  cuisine?: string;
+  meal_type?: string;
+}
+
 export type Language = 'en' | 'id';
 
 export interface Translation {

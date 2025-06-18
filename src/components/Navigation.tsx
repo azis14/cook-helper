@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, BookOpen, Lightbulb, Calendar } from 'lucide-react';
+import { Package, BookOpen, Lightbulb, Calendar, Database } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: string;
@@ -10,7 +10,8 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
   const tabs = [
     { id: 'ingredients', label: 'Bahan', icon: Package },
     { id: 'recipes', label: 'Resep', icon: BookOpen },
-    { id: 'suggestions', label: 'Saran', icon: Lightbulb },
+    { id: 'suggestions', label: 'Inspirasi AI', icon: Lightbulb },
+    { id: 'dataset', label: 'Dataset', icon: Database },
     { id: 'weekly-plan', label: 'Rencana Mingguan', icon: Calendar },
   ];
 
