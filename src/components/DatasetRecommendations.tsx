@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Star, Clock, Users, ChefHat, TrendingUp, Filter, Search, ExternalLink, Heart } from 'lucide-react';
+import { Database, Clock, Users, ChefHat, TrendingUp, Filter, Search, ExternalLink, Heart } from 'lucide-react';
 import SupabaseDatasetService, { RecipeRecommendation } from '../services/supabaseDatasetService';
 import { Ingredient } from '../types';
 import { RecipeDetailModal } from './RecipeDetailModal';

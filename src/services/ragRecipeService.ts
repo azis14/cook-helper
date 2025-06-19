@@ -211,6 +211,8 @@ Pastikan:
 8. Berikan alasan relevansi yang spesifik
 9. JSON format yang valid tanpa komentar
 10. Urutkan berdasarkan kesesuaian dengan bahan yang tersedia
+11. Jika bahan yang diperlukan hanya secukupnya, gunakan "secukupnya" sebagai unit dan null untuk quantity
+12. Gunakan bahasa Indonesia yang baik dan benar
 `;
 
       const result = await this.geminiService!.generateContent(prompt);
