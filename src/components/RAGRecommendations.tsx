@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, Zap, TrendingUp, Search, Filter, Star, Clock, Users, ChefHat, Target, RefreshCw, Sparkles } from 'lucide-react';
+import { Brain, Zap, TrendingUp, Search, Filter, Star, Clock, Users, ChefHat, Target, RefreshCw, Sparkles, Save, Check } from 'lucide-react';
 import RAGRecipeService, { RAGRecipeRecommendation } from '../services/ragRecipeService';
 import { Ingredient } from '../types';
 import { RecipeDetailModal } from './RecipeDetailModal';
+import { useRecipes } from '../hooks/useRecipes';
+import { useAuth } from '../hooks/useAuth';
 
 interface RAGRecommendationsProps {
   ingredients: Ingredient[];
@@ -15,6 +17,8 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
   showSuccess,
   showError,
 }) => {
+  const { user } = useAuth();
+  const { addRecipe } = useRecipes(user?.id);
   const [ragService] = useState(() => new RAGRecipeService());
   const [recommendations, setRecommendations] = useState<RAGRecipeRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,6 +27,8 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
   const [selectedRecipe, setSelectedRecipe] = useState<RAGRecipeRecommendation | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [savingRecipeId, setSavingRecipeId] = useState<string | null>(null);
+  const [savedRecipeIds, setSavedRecipeIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState({
     minSimilarity: 0.3,
     maxResults: 12,
@@ -40,6 +46,24 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
     medium: 'bg-yellow-100 text-yellow-800',
     hard: 'bg-red-100 text-red-800',
   };
+
+  // Load saved recipe IDs from localStorage on component mount
+  useEffect(() => {
+    const savedRecipeIdsStorage = localStorage.getItem('saved-rag-recipe-ids');
+    
+    if (savedRecipeIdsStorage) {
+      try {
+        setSavedRecipeIds(new Set(JSON.parse(savedRecipeIdsStorage)));
+      } catch (err) {
+        console.error('Error parsing saved RAG recipe IDs:', err);
+      }
+    }
+  }, []);
+
+  // Save savedRecipeIds to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('saved-rag-recipe-ids', JSON.stringify(Array.from(savedRecipeIds)));
+  }, [savedRecipeIds]);
 
   useEffect(() => {
     initializeService();
@@ -127,6 +151,48 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  const saveRecipeToCollection = async (recipe: RAGRecipeRecommendation) => {
+    if (!user?.id) return;
+
+    setSavingRecipeId(recipe.id);
+    
+    try {
+      const recipeData = {
+        name: recipe.name,
+        description: recipe.description,
+        prep_time: recipe.prep_time,
+        cook_time: recipe.cook_time,
+        servings: recipe.servings,
+        difficulty: recipe.difficulty,
+        instructions: recipe.instructions,
+        tags: recipe.tags,
+      };
+
+      const ingredients = recipe.recipe_ingredients?.map(ing => ({
+        name: ing.name,
+        quantity: ing.quantity,
+        unit: ing.unit,
+      })) || [];
+
+      await addRecipe(recipeData, ingredients);
+      
+      // Mark recipe as saved
+      setSavedRecipeIds(prev => new Set([...prev, recipe.id]));
+      
+      // Show success toast
+      showSuccess('Resep RAG berhasil disimpan ke koleksi Anda!');
+    } catch (err) {
+      console.error('Error saving RAG recipe:', err);
+      showError('Gagal menyimpan resep. Silakan coba lagi.');
+    } finally {
+      setSavingRecipeId(null);
+    }
+  };
+
+  const isRecipeSaved = (recipe: RAGRecipeRecommendation) => {
+    return savedRecipeIds.has(recipe.id);
   };
 
   const handleCardClick = (recipe: RAGRecipeRecommendation) => {
@@ -301,12 +367,14 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
           {recommendations.map((recipe) => (
             <div
               key={recipe.id}
-              className="bg-white rounded-lg shadow-md border border-purple-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => handleCardClick(recipe)}
+              className="bg-white rounded-lg shadow-md border border-purple-100 overflow-hidden hover:shadow-lg transition-shadow"
             >
               <div className="p-4">
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-semibold text-gray-900 text-lg line-clamp-2">
+                  <h3 
+                    className="font-semibold text-gray-900 text-lg line-clamp-2 cursor-pointer hover:text-purple-600 transition-colors"
+                    onClick={() => handleCardClick(recipe)}
+                  >
                     {recipe.name}
                   </h3>
                   <div className="flex items-center gap-1 ml-2">
@@ -399,9 +467,37 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
                   </div>
                 )}
 
+                {/* Save Recipe Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    saveRecipeToCollection(recipe);
+                  }}
+                  disabled={savingRecipeId === recipe.id || isRecipeSaved(recipe)}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors mb-2 ${
+                    isRecipeSaved(recipe)
+                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                      : savingRecipeId === recipe.id
+                      ? 'bg-gray-400 text-white cursor-not-allowed'
+                      : 'bg-green-500 text-white hover:bg-green-600'
+                  }`}
+                >
+                  {isRecipeSaved(recipe) ? (
+                    <>
+                      <Check size={16} />
+                      Sudah Disimpan
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      {savingRecipeId === recipe.id ? 'Menyimpan...' : 'Simpan Resep'}
+                    </>
+                  )}
+                </button>
+
                 {/* Click hint */}
                 <div className="text-xs text-gray-400 text-center">
-                  Klik untuk melihat detail lengkap
+                  Klik judul untuk melihat detail lengkap
                 </div>
               </div>
             </div>
