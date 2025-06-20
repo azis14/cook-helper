@@ -3,6 +3,7 @@ import { Plus, Trash2, Edit, Clock, Users, ChefHat } from 'lucide-react';
 import { useRecipes } from '../hooks/useRecipes';
 import { useAuth } from '../hooks/useAuth';
 import { RecipeDetailModal } from './RecipeDetailModal';
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { Recipe } from '../types';
 
 export const RecipeManager: React.FC = () => {
@@ -12,6 +13,17 @@ export const RecipeManager: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    recipeId: string | null;
+    recipeName: string;
+    isDeleting: boolean;
+  }>({
+    isOpen: false,
+    recipeId: null,
+    recipeName: '',
+    isDeleting: false,
+  });
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -102,14 +114,43 @@ export const RecipeManager: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus resep ini?')) {
-      try {
-        await deleteRecipe(id);
-      } catch (err) {
-        console.error('Error deleting recipe:', err);
-      }
+  const handleDeleteClick = (recipe: any) => {
+    setDeleteModal({
+      isOpen: true,
+      recipeId: recipe.id,
+      recipeName: recipe.name,
+      isDeleting: false,
+    });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteModal.recipeId) return;
+
+    setDeleteModal(prev => ({ ...prev, isDeleting: true }));
+
+    try {
+      await deleteRecipe(deleteModal.recipeId);
+      setDeleteModal({
+        isOpen: false,
+        recipeId: null,
+        recipeName: '',
+        isDeleting: false,
+      });
+    } catch (err) {
+      console.error('Error deleting recipe:', err);
+      setDeleteModal(prev => ({ ...prev, isDeleting: false }));
     }
+  };
+
+  const handleDeleteCancel = () => {
+    if (deleteModal.isDeleting) return; // Prevent closing while deleting
+    
+    setDeleteModal({
+      isOpen: false,
+      recipeId: null,
+      recipeName: '',
+      isDeleting: false,
+    });
   };
 
   const handleCardClick = (recipe: Recipe) => {
@@ -410,16 +451,18 @@ export const RecipeManager: React.FC = () => {
                         e.stopPropagation();
                         handleEdit(recipe);
                       }}
-                      className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                      className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                      title="Edit resep"
                     >
                       <Edit size={14} />
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDelete(recipe.id);
+                        handleDeleteClick(recipe);
                       }}
-                      className="p-1 text-red-600 hover:bg-red-100 rounded"
+                      className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                      title="Hapus resep"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -472,6 +515,16 @@ export const RecipeManager: React.FC = () => {
           }}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        itemName={deleteModal.recipeName}
+        itemType="resep"
+        isDeleting={deleteModal.isDeleting}
+      />
     </div>
   );
 };
