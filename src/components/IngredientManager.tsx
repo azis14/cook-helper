@@ -2,12 +2,24 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Edit } from 'lucide-react';
 import { useIngredients } from '../hooks/useIngredients';
 import { useAuth } from '../hooks/useAuth';
+import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 
 export const IngredientManager: React.FC = () => {
   const { user } = useAuth();
   const { ingredients, loading, error, addIngredient, updateIngredient, deleteIngredient } = useIngredients(user?.id);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    ingredientId: string | null;
+    ingredientName: string;
+    isDeleting: boolean;
+  }>({
+    isOpen: false,
+    ingredientId: null,
+    ingredientName: '',
+    isDeleting: false,
+  });
   const [formData, setFormData] = useState({
     name: '',
     quantity: 1,
@@ -78,14 +90,43 @@ export const IngredientManager: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus bahan ini?')) {
-      try {
-        await deleteIngredient(id);
-      } catch (err) {
-        console.error('Error deleting ingredient:', err);
-      }
+  const handleDeleteClick = (ingredient: any) => {
+    setDeleteModal({
+      isOpen: true,
+      ingredientId: ingredient.id,
+      ingredientName: ingredient.name,
+      isDeleting: false,
+    });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteModal.ingredientId) return;
+
+    setDeleteModal(prev => ({ ...prev, isDeleting: true }));
+
+    try {
+      await deleteIngredient(deleteModal.ingredientId);
+      setDeleteModal({
+        isOpen: false,
+        ingredientId: null,
+        ingredientName: '',
+        isDeleting: false,
+      });
+    } catch (err) {
+      console.error('Error deleting ingredient:', err);
+      setDeleteModal(prev => ({ ...prev, isDeleting: false }));
     }
+  };
+
+  const handleDeleteCancel = () => {
+    if (deleteModal.isDeleting) return; // Prevent closing while deleting
+    
+    setDeleteModal({
+      isOpen: false,
+      ingredientId: null,
+      ingredientName: '',
+      isDeleting: false,
+    });
   };
 
   const groupedIngredients = ingredients.reduce((acc, ingredient) => {
@@ -251,13 +292,15 @@ export const IngredientManager: React.FC = () => {
                       <div className="flex gap-1">
                         <button
                           onClick={() => handleEdit(ingredient)}
-                          className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                          className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                          title="Edit bahan"
                         >
                           <Edit size={14} />
                         </button>
                         <button
-                          onClick={() => handleDelete(ingredient.id)}
-                          className="p-1 text-red-600 hover:bg-red-100 rounded"
+                          onClick={() => handleDeleteClick(ingredient)}
+                          className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                          title="Hapus bahan"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -278,6 +321,16 @@ export const IngredientManager: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        itemName={deleteModal.ingredientName}
+        itemType="bahan"
+        isDeleting={deleteModal.isDeleting}
+      />
     </div>
   );
 };
