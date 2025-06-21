@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
+import { Footer } from './components/Footer';
 import { IngredientManager } from './components/IngredientManager';
 import { RecipeManager } from './components/RecipeManager';
 import { RecipeSuggestions } from './components/RecipeSuggestions';
@@ -117,7 +118,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex flex-col">
       <Header />
       <div className="flex items-center justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
         <div className="text-sm text-gray-600">
@@ -132,9 +133,14 @@ function App() {
         </button>
       </div>
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      
+      {/* Main content area with flex-1 to push footer down */}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         {renderActiveTab()}
       </main>
+
+      {/* Footer */}
+      <Footer />
 
       {/* Toast notifications */}
       {toasts.map((toast) => (
