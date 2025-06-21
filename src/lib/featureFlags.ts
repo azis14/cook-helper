@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 interface FeatureConfig {
   enabled: boolean;
   description?: string;
@@ -10,130 +12,101 @@ interface AppConfig {
     rag: FeatureConfig;
     weeklyPlanner: FeatureConfig;
   };
-  api: {
-    rateLimit: {
-      enabled: boolean;
-      requestsPerMinute: number;
-    };
-    cache: {
-      enabled: boolean;
-      ttlMinutes: number;
-    };
-  };
-  ui: {
-    debug: boolean;
-    analytics: {
-      enabled: boolean;
-    };
-  };
+}
+
+interface FeatureFlag {
+  id: string;
+  name: string;
+  enabled: boolean;
+  description?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 class FeatureFlagService {
   private config: AppConfig | null = null;
   private configPromise: Promise<AppConfig> | null = null;
+  private lastFetch: number = 0;
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
   /**
-   * Load configuration from YAML file
+   * Load configuration from Supabase database
    */
   private async loadConfig(): Promise<AppConfig> {
-    if (this.config) {
+    const now = Date.now();
+    
+    // Return cached config if still valid
+    if (this.config && (now - this.lastFetch) < this.CACHE_DURATION) {
       return this.config;
     }
 
+    // Return existing promise if already loading
     if (this.configPromise) {
       return this.configPromise;
     }
 
     this.configPromise = this.fetchConfig();
-    this.config = await this.configPromise;
-    return this.config;
+    try {
+      this.config = await this.configPromise;
+      this.lastFetch = now;
+      return this.config;
+    } finally {
+      this.configPromise = null;
+    }
   }
 
   private async fetchConfig(): Promise<AppConfig> {
     try {
-      const response = await fetch('/config.yaml');
-      if (!response.ok) {
-        throw new Error(`Failed to load config: ${response.status}`);
+      const { data: featureFlags, error } = await supabase
+        .from('feature_flags')
+        .select('*');
+
+      if (error) {
+        console.error('Error fetching feature flags from Supabase:', error);
+        return this.getDefaultConfig();
       }
-      
-      const yamlText = await response.text();
-      const config = this.parseYAML(yamlText);
-      
-      console.log('Feature flags loaded:', config);
+
+      if (!featureFlags || featureFlags.length === 0) {
+        console.warn('No feature flags found in database, using defaults');
+        return this.getDefaultConfig();
+      }
+
+      // Convert database rows to config format
+      const config = this.convertToConfig(featureFlags);
+      console.log('Feature flags loaded from Supabase:', config);
       return config;
     } catch (error) {
-      console.error('Error loading feature flags, using defaults:', error);
+      console.error('Error loading feature flags from Supabase, using defaults:', error);
       return this.getDefaultConfig();
     }
   }
 
   /**
-   * Simple YAML parser for our configuration structure
+   * Convert database feature flags to config format
    */
-  private parseYAML(yamlText: string): AppConfig {
-    const lines = yamlText.split('\n');
-    const config: any = {};
-    let currentSection: any = config;
-    let sectionStack: any[] = [config];
-    let indentStack: number[] = [0];
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      
-      // Skip empty lines and comments
-      if (!trimmed || trimmed.startsWith('#')) {
-        continue;
-      }
-
-      // Calculate indentation
-      const indent = line.length - line.trimStart().length;
-      
-      // Handle indentation changes
-      while (indentStack.length > 1 && indent <= indentStack[indentStack.length - 1]) {
-        indentStack.pop();
-        sectionStack.pop();
-      }
-      
-      currentSection = sectionStack[sectionStack.length - 1];
-
-      if (trimmed.includes(':')) {
-        const [key, value] = trimmed.split(':', 2);
-        const cleanKey = key.trim();
-        const cleanValue = value?.trim();
-
-        if (!cleanValue || cleanValue === '') {
-          // This is a section header
-          currentSection[cleanKey] = {};
-          sectionStack.push(currentSection[cleanKey]);
-          indentStack.push(indent);
-        } else {
-          // This is a key-value pair
-          currentSection[cleanKey] = this.parseValue(cleanValue);
-        }
-      }
-    }
-
-    return config as AppConfig;
-  }
-
-  private parseValue(value: string): any {
-    // Remove quotes
-    const cleaned = value.replace(/^["']|["']$/g, '');
+  private convertToConfig(featureFlags: FeatureFlag[]): AppConfig {
+    const features: any = {};
     
-    // Parse boolean
-    if (cleaned === 'true') return true;
-    if (cleaned === 'false') return false;
-    
-    // Parse number
-    if (/^\d+$/.test(cleaned)) return parseInt(cleaned, 10);
-    if (/^\d+\.\d+$/.test(cleaned)) return parseFloat(cleaned);
-    
-    // Return as string
-    return cleaned;
+    featureFlags.forEach(flag => {
+      features[flag.name] = {
+        enabled: flag.enabled,
+        description: flag.description
+      };
+    });
+
+    // Ensure all required features exist with defaults
+    const defaultFeatures = this.getDefaultConfig().features;
+    Object.keys(defaultFeatures).forEach(featureName => {
+      if (!features[featureName]) {
+        features[featureName] = defaultFeatures[featureName as keyof typeof defaultFeatures];
+      }
+    });
+
+    return { features };
   }
 
   /**
-   * Default configuration when YAML loading fails
+   * Default configuration when database loading fails
    */
   private getDefaultConfig(): AppConfig {
     return {
@@ -142,14 +115,6 @@ class FeatureFlagService {
         suggestions: { enabled: true, description: "AI suggestions enabled by default" },
         rag: { enabled: true, description: "RAG feature enabled by default" },
         weeklyPlanner: { enabled: true, description: "Weekly planner enabled by default" },
-      },
-      api: {
-        rateLimit: { enabled: true, requestsPerMinute: 60 },
-        cache: { enabled: true, ttlMinutes: 30 },
-      },
-      ui: {
-        debug: false,
-        analytics: { enabled: false },
       },
     };
   }
@@ -200,8 +165,15 @@ class FeatureFlagService {
    */
   isFeatureEnabledSync(featureName: keyof AppConfig['features']): boolean {
     if (!this.config) {
-      console.warn(`Feature flag ${featureName} checked before config loaded, returning false`);
-      return featureName !== 'dataset'; // All features except dataset default to true
+      console.warn(`Feature flag ${featureName} checked before config loaded, returning default`);
+      // Return safe defaults when config not loaded
+      const defaults: Record<string, boolean> = {
+        dataset: false, // Dataset disabled by default for security
+        suggestions: true,
+        rag: true,
+        weeklyPlanner: true,
+      };
+      return defaults[featureName] ?? false;
     }
     return this.config.features[featureName]?.enabled ?? false;
   }
@@ -211,6 +183,38 @@ class FeatureFlagService {
    */
   async preloadConfig(): Promise<void> {
     await this.loadConfig();
+  }
+
+  /**
+   * Clear cache to force reload on next access
+   */
+  clearCache(): void {
+    this.config = null;
+    this.lastFetch = 0;
+  }
+
+  /**
+   * Update a feature flag (admin function)
+   */
+  async updateFeatureFlag(featureName: string, enabled: boolean): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('feature_flags')
+        .update({ enabled })
+        .eq('name', featureName);
+
+      if (error) {
+        console.error('Error updating feature flag:', error);
+        return false;
+      }
+
+      // Clear cache to force reload
+      this.clearCache();
+      return true;
+    } catch (error) {
+      console.error('Error updating feature flag:', error);
+      return false;
+    }
   }
 }
 
@@ -230,6 +234,11 @@ export const getFeatureConfig = (featureName: keyof AppConfig['features']) =>
 export const getConfig = () => featureFlagService.getConfig();
 
 export const preloadFeatureFlags = () => featureFlagService.preloadConfig();
+
+export const updateFeatureFlag = (featureName: string, enabled: boolean) =>
+  featureFlagService.updateFeatureFlag(featureName, enabled);
+
+export const clearFeatureFlagCache = () => featureFlagService.clearCache();
 
 export default featureFlagService;
 

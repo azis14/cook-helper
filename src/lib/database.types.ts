@@ -9,6 +9,32 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      feature_flags: {
+        Row: {
+          id: string
+          name: string
+          enabled: boolean
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          enabled?: boolean
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          enabled?: boolean
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       ingredients: {
         Row: {
           id: string
