@@ -21,28 +21,28 @@ export function useUserProfile(userId: string | undefined) {
     
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: existingProfile, error } = await supabase
         .from('user_profiles')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // Profile doesn't exist, create one
-          const { data: newProfile, error: createError } = await supabase
-            .from('user_profiles')
-            .insert({ user_id: userId })
-            .select()
-            .single();
+        throw error;
+      }
 
-          if (createError) throw createError;
-          setProfile(newProfile);
-        } else {
-          throw error;
-        }
+      if (existingProfile) {
+        setProfile(existingProfile);
       } else {
-        setProfile(data);
+        // Profile doesn't exist, create one
+        const { data: newProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert({ user_id: userId })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        setProfile(newProfile);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
