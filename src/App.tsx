@@ -33,6 +33,7 @@ function App() {
         return <IngredientManager />;
       case 'recipes':
         return <RecipeManager />;
+      // Temporarily hidden - keeping code for future use
       case 'suggestions':
         return (
           <RecipeSuggestions 

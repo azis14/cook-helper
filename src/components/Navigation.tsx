@@ -10,8 +10,9 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
   const tabs = [
     { id: 'ingredients', label: 'Bahan', icon: Package },
     { id: 'recipes', label: 'Resep', icon: BookOpen },
-    { id: 'suggestions', label: 'Inspirasi AI', icon: Lightbulb },
-    { id: 'dataset', label: 'Dataset', icon: Database },
+    // Temporarily hidden - keeping code for future use
+    // { id: 'suggestions', label: 'Inspirasi AI', icon: Lightbulb },
+    // { id: 'dataset', label: 'Dataset', icon: Database },
     { id: 'rag', label: 'RAG AI', icon: Brain },
     { id: 'weekly-plan', label: 'Rencana Mingguan', icon: Calendar },
   ];
