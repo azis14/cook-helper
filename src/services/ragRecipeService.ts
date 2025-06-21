@@ -84,8 +84,8 @@ class RAGRecipeService {
     await this.initialize();
 
     const {
-      minLoves = 50,
-      maxResults = 12,
+      minLoves = 10,
+      maxResults = 20,
       minSimilarity = 0.3
     } = options;
 
@@ -94,12 +94,12 @@ class RAGRecipeService {
       const queryContent = this.embeddingService.createQueryContent(ingredients);
       const queryEmbedding = await this.embeddingService.generateEmbedding(queryContent);
 
-      // Use Supabase's vector similarity search
+      // Use Supabase's vector similarity search with increased limit
       const { data: similarRecipes, error } = await supabase.rpc('find_similar_recipes', {
         query_embedding: queryEmbedding,
         min_loves: minLoves,
         similarity_threshold: minSimilarity,
-        match_count: maxResults * 2 // Get more results to process with AI
+        match_count: Math.max(maxResults * 3, 60) // Get more results to ensure we have enough after processing
       });
 
       if (error) {
@@ -109,14 +109,16 @@ class RAGRecipeService {
       }
 
       if (!similarRecipes || similarRecipes.length === 0) {
-        console.log('No similar recipes found with vector search');
-        return [];
+        console.log('No similar recipes found with vector search, trying fallback...');
+        return this.getFallbackRecommendations(ingredients, options);
       }
+
+      console.log(`Vector search returned ${similarRecipes.length} recipes`);
 
       // Process results with AI if available, otherwise use traditional conversion
       let recommendations: RAGRecipeRecommendation[];
       
-      if (this.geminiService) {
+      if (this.geminiService && similarRecipes.length > 0) {
         recommendations = await this.processWithAI(similarRecipes, ingredients, maxResults);
       } else {
         recommendations = similarRecipes
@@ -124,7 +126,7 @@ class RAGRecipeService {
           .map((result: any) => this.convertToRecommendation(result, ingredients));
       }
 
-      console.log(`Found ${recommendations.length} RAG recommendations`);
+      console.log(`Returning ${recommendations.length} RAG recommendations`);
       return recommendations;
     } catch (error) {
       console.error('Error getting RAG recommendations:', error);
@@ -146,20 +148,29 @@ class RAGRecipeService {
         `${ing.name} (${ing.quantity} ${ing.unit})`
       ).join(', ');
 
-      // Prepare recipe references for AI
-      const recipeReferences = vectorResults.slice(0, Math.min(vectorResults.length, 8)).map((result, index) => ({
-        index: index + 1,
-        title: result.title,
-        ingredients: result.ingredients,
-        steps: result.steps,
-        loves_count: result.loves_count,
-        similarity_score: result.similarity_score
-      }));
+      // Process in smaller batches to avoid AI token limits
+      const batchSize = 8;
+      const allRecommendations: RAGRecipeRecommendation[] = [];
 
-      const prompt = `
+      for (let i = 0; i < vectorResults.length && allRecommendations.length < maxResults; i += batchSize) {
+        const batch = vectorResults.slice(i, i + batchSize);
+        const remainingSlots = maxResults - allRecommendations.length;
+        const batchMaxResults = Math.min(remainingSlots, batchSize);
+
+        // Prepare recipe references for AI
+        const recipeReferences = batch.map((result, index) => ({
+          index: index + 1,
+          title: result.title,
+          ingredients: result.ingredients,
+          steps: result.steps,
+          loves_count: result.loves_count,
+          similarity_score: result.similarity_score
+        }));
+
+        const prompt = `
 Saya memiliki bahan-bahan berikut: ${ingredientList}
 
-Berdasarkan hasil pencarian vektor berikut, tolong pilih dan format ${maxResults} resep terbaik yang paling cocok dengan bahan saya. Berikan respon dalam format JSON yang valid dengan struktur berikut:
+Berdasarkan hasil pencarian vektor berikut, tolong pilih dan format ${batchMaxResults} resep terbaik yang paling cocok dengan bahan saya. Berikan respon dalam format JSON yang valid dengan struktur berikut:
 
 REFERENSI RESEP DARI DATABASE:
 ${recipeReferences.map(ref => `
@@ -215,30 +226,41 @@ Pastikan:
 12. Gunakan bahasa Indonesia yang baik dan benar
 `;
 
-      const result = await this.geminiService!.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+        try {
+          const result = await this.geminiService!.generateContent(prompt);
+          const response = await result.response;
+          const text = response.text();
 
-      // Extract JSON from markdown code block
-      const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
-      if (!jsonMatch || !jsonMatch[1]) {
-        console.warn('AI response format was unexpected, falling back to traditional method');
-        return vectorResults
-          .slice(0, maxResults)
-          .map((result: any) => this.convertToRecommendation(result, userIngredients));
+          // Extract JSON from markdown code block
+          const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+          if (!jsonMatch || !jsonMatch[1]) {
+            console.warn('AI response format was unexpected for batch, falling back to traditional method');
+            const fallbackBatch = batch
+              .slice(0, batchMaxResults)
+              .map((result: any) => this.convertToRecommendation(result, userIngredients));
+            allRecommendations.push(...fallbackBatch);
+            continue;
+          }
+
+          const parsedResponse = JSON.parse(jsonMatch[1]);
+          const batchRecommendations = this.convertAIResponseToRecommendations(parsedResponse, batch, userIngredients);
+          allRecommendations.push(...batchRecommendations.slice(0, batchMaxResults));
+        } catch (parseError) {
+          console.error('JSON parsing error for batch:', parseError);
+          // Fallback to traditional method for this batch
+          const fallbackBatch = batch
+            .slice(0, batchMaxResults)
+            .map((result: any) => this.convertToRecommendation(result, userIngredients));
+          allRecommendations.push(...fallbackBatch);
+        }
+
+        // Add small delay between batches to avoid rate limiting
+        if (i + batchSize < vectorResults.length && allRecommendations.length < maxResults) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
 
-      try {
-        const parsedResponse = JSON.parse(jsonMatch[1]);
-        return this.convertAIResponseToRecommendations(parsedResponse, vectorResults, userIngredients);
-      } catch (parseError) {
-        console.error('JSON parsing error:', parseError);
-        console.error('Attempted to parse:', jsonMatch[1]);
-        // Fallback to traditional method
-        return vectorResults
-          .slice(0, maxResults)
-          .map((result: any) => this.convertToRecommendation(result, userIngredients));
-      }
+      return allRecommendations.slice(0, maxResults);
     } catch (error) {
       console.error('Error processing with AI:', error);
       // Fallback to traditional method
@@ -321,7 +343,7 @@ Pastikan:
   ): Promise<RAGRecipeRecommendation[]> {
     console.log('Using fallback recommendation method');
     
-    const { minLoves = 50, maxResults = 12 } = options;
+    const { minLoves = 10, maxResults = 20 } = options;
 
     try {
       // Simple fallback: get popular recipes and do basic ingredient matching
@@ -331,10 +353,12 @@ Pastikan:
         .is('user_id', null)
         .gte('loves_count', minLoves)
         .order('loves_count', { ascending: false })
-        .limit(maxResults * 2); // Get more to filter
+        .limit(maxResults * 3); // Get more to filter
 
       if (error) throw error;
       if (!recipes) return [];
+
+      console.log(`Fallback method found ${recipes.length} recipes`);
 
       const userIngredientNames = ingredients.map(ing => ing.name.toLowerCase());
       
@@ -342,19 +366,29 @@ Pastikan:
       const matchedRecipes = recipes
         .map(recipe => {
           const ingredientsText = recipe.ingredients.toLowerCase();
-          const matchCount = userIngredientNames.filter(userIng => 
-            ingredientsText.includes(userIng)
-          ).length;
+          const titleText = recipe.title.toLowerCase();
+          
+          let matchCount = 0;
+          userIngredientNames.forEach(userIng => {
+            if (ingredientsText.includes(userIng) || titleText.includes(userIng)) {
+              matchCount++;
+            }
+          });
+          
+          // Also give points for popular recipes
+          const popularityScore = Math.min(recipe.loves_count / 1000, 1);
+          const totalScore = (matchCount / Math.max(userIngredientNames.length, 1)) * 0.7 + popularityScore * 0.3;
           
           return {
             ...recipe,
-            similarity_score: matchCount / Math.max(userIngredientNames.length, 1)
+            similarity_score: totalScore
           };
         })
-        .filter(recipe => recipe.similarity_score > 0)
+        .filter(recipe => recipe.similarity_score > 0.1) // Lower threshold for fallback
         .sort((a, b) => b.similarity_score - a.similarity_score)
         .slice(0, maxResults);
 
+      console.log(`Fallback method returning ${matchedRecipes.length} recipes`);
       return matchedRecipes.map(recipe => this.convertToRecommendation(recipe, ingredients));
     } catch (error) {
       console.error('Error in fallback recommendations:', error);
@@ -374,7 +408,7 @@ Pastikan:
   ): Promise<RAGRecipeRecommendation[]> {
     await this.initialize();
 
-    const { maxResults = 10, minSimilarity = 0.4 } = options;
+    const { maxResults = 20, minSimilarity = 0.3 } = options;
 
     try {
       const queryEmbedding = await this.embeddingService.generateEmbedding(query);
@@ -489,7 +523,7 @@ Format dalam JSON yang sama seperti sebelumnya, fokus pada resep yang paling rel
     query: string,
     options: { maxResults?: number; minSimilarity?: number }
   ): Promise<RAGRecipeRecommendation[]> {
-    const { maxResults = 10 } = options;
+    const { maxResults = 20 } = options;
 
     try {
       // Simple text search as fallback
