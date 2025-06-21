@@ -13,6 +13,20 @@ interface RecipeData {
   steps: string;
 }
 
+interface FeatureConfig {
+  enabled: boolean;
+  description?: string;
+}
+
+interface AppConfig {
+  features: {
+    dataset: FeatureConfig;
+    suggestions: FeatureConfig;
+    rag: FeatureConfig;
+    weeklyPlanner: FeatureConfig;
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -20,6 +34,22 @@ serve(async (req) => {
   }
 
   try {
+    // Check if dataset feature is enabled
+    const isDatasetEnabled = await checkDatasetFeature();
+    if (!isDatasetEnabled) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Dataset feature is disabled',
+          timestamp: new Date().toISOString()
+        }),
+        { 
+          status: 403, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
     // Initialize Supabase client with service role key for full access
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -134,6 +164,87 @@ serve(async (req) => {
     )
   }
 })
+
+async function checkDatasetFeature(): Promise<boolean> {
+  try {
+    // Try to fetch config.yaml from the public directory
+    const configResponse = await fetch('https://your-domain.com/config.yaml') // Replace with actual domain
+    if (!configResponse.ok) {
+      console.warn('Could not fetch config.yaml, assuming dataset is disabled')
+      return false
+    }
+    
+    const yamlText = await configResponse.text()
+    const config = parseYAML(yamlText)
+    
+    return config.features?.dataset?.enabled ?? false
+  } catch (error) {
+    console.warn('Error checking dataset feature flag:', error)
+    return false // Default to disabled for security
+  }
+}
+
+function parseYAML(yamlText: string): AppConfig {
+  const lines = yamlText.split('\n')
+  const config: any = {}
+  let currentSection: any = config
+  let sectionStack: any[] = [config]
+  let indentStack: number[] = [0]
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue
+    }
+
+    // Calculate indentation
+    const indent = line.length - line.trimStart().length
+    
+    // Handle indentation changes
+    while (indentStack.length > 1 && indent <= indentStack[indentStack.length - 1]) {
+      indentStack.pop()
+      sectionStack.pop()
+    }
+    
+    currentSection = sectionStack[sectionStack.length - 1]
+
+    if (trimmed.includes(':')) {
+      const [key, value] = trimmed.split(':', 2)
+      const cleanKey = key.trim()
+      const cleanValue = value?.trim()
+
+      if (!cleanValue || cleanValue === '') {
+        // This is a section header
+        currentSection[cleanKey] = {}
+        sectionStack.push(currentSection[cleanKey])
+        indentStack.push(indent)
+      } else {
+        // This is a key-value pair
+        currentSection[cleanKey] = parseValue(cleanValue)
+      }
+    }
+  }
+
+  return config as AppConfig
+}
+
+function parseValue(value: string): any {
+  // Remove quotes
+  const cleaned = value.replace(/^["']|["']$/g, '')
+  
+  // Parse boolean
+  if (cleaned === 'true') return true
+  if (cleaned === 'false') return false
+  
+  // Parse number
+  if (/^\d+$/.test(cleaned)) return parseInt(cleaned, 10)
+  if (/^\d+\.\d+$/.test(cleaned)) return parseFloat(cleaned)
+  
+  // Return as string
+  return cleaned
+}
 
 async function processBatch(
   recipes: RecipeData[], 

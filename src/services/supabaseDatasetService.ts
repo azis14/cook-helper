@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Ingredient, Recipe } from '../types';
+import { isFeatureEnabledSync } from '../lib/featureFlags';
 
 export interface DatasetRecipe {
   id: string;
@@ -21,11 +22,26 @@ export interface RecipeRecommendation extends Recipe {
 }
 
 class SupabaseDatasetService {
+  /**
+   * Check if dataset feature is enabled before making any requests
+   */
+  private checkFeatureEnabled(): boolean {
+    if (!isFeatureEnabledSync('dataset')) {
+      console.warn('Dataset feature is disabled');
+      return false;
+    }
+    return true;
+  }
+
   async getRecommendations(
     availableIngredients: Ingredient[],
     minLoves: number = 50,
     limit: number = 12
   ): Promise<RecipeRecommendation[]> {
+    if (!this.checkFeatureEnabled()) {
+      return [];
+    }
+
     try {
       // Get all public dataset recipes (where user_id is NULL)
       const { data: datasetRecipes, error } = await supabase
@@ -67,6 +83,10 @@ class SupabaseDatasetService {
   }
 
   async getPopularRecipes(limit: number = 20): Promise<DatasetRecipe[]> {
+    if (!this.checkFeatureEnabled()) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('dataset_recipes')
@@ -84,6 +104,10 @@ class SupabaseDatasetService {
   }
 
   async searchRecipes(query: string, limit: number = 20): Promise<DatasetRecipe[]> {
+    if (!this.checkFeatureEnabled()) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('dataset_recipes')
@@ -106,6 +130,10 @@ class SupabaseDatasetService {
     avgLoves: number;
     topCategories: string[];
   }> {
+    if (!this.checkFeatureEnabled()) {
+      return { total: 0, avgLoves: 0, topCategories: [] };
+    }
+
     try {
       const { data, error } = await supabase
         .from('dataset_recipes')

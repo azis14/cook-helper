@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
 import { IngredientManager } from './components/IngredientManager';
@@ -14,6 +14,7 @@ import { useIngredients } from './hooks/useIngredients';
 import { useRecipes } from './hooks/useRecipes';
 import { useToast } from './hooks/useToast';
 import { signOut } from './lib/supabase';
+import { isFeatureEnabledSync, preloadFeatureFlags } from './lib/featureFlags';
 import { LogOut } from 'lucide-react';
 
 function App() {
@@ -22,51 +23,88 @@ function App() {
   const { recipes } = useRecipes(user?.id);
   const { toasts, showSuccess, showError, hideToast } = useToast();
   const [activeTab, setActiveTab] = useState('ingredients');
+  const [featuresLoaded, setFeaturesLoaded] = useState(false);
+
+  // Preload feature flags on app start
+  useEffect(() => {
+    preloadFeatureFlags().then(() => {
+      setFeaturesLoaded(true);
+    }).catch(error => {
+      console.error('Failed to preload feature flags:', error);
+      setFeaturesLoaded(true); // Continue with defaults
+    });
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
   };
 
   const renderActiveTab = () => {
+    // Don't render tabs until features are loaded to prevent accessing disabled features
+    if (!featuresLoaded) {
+      return (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'ingredients':
         return <IngredientManager />;
       case 'recipes':
         return <RecipeManager />;
-      // Temporarily hidden - keeping code for future use
       case 'suggestions':
-        return (
+        return isFeatureEnabledSync('suggestions') ? (
           <RecipeSuggestions 
             ingredients={ingredients} 
             recipes={recipes}
             showSuccess={showSuccess}
             showError={showError}
           />
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Fitur Inspirasi AI tidak tersedia saat ini.</p>
+          </div>
         );
       case 'dataset':
-        return (
+        return isFeatureEnabledSync('dataset') ? (
           <DatasetRecommendations
             ingredients={ingredients}
             showSuccess={showSuccess}
             showError={showError}
           />
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Fitur Dataset tidak tersedia saat ini.</p>
+          </div>
         );
       case 'rag':
-        return (
+        return isFeatureEnabledSync('rag') ? (
           <RAGRecommendations
             ingredients={ingredients}
             showSuccess={showSuccess}
             showError={showError}
           />
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Fitur RAG AI tidak tersedia saat ini.</p>
+          </div>
         );
       case 'weekly-plan':
-        return <WeeklyPlanner ingredients={ingredients} recipes={recipes} />;
+        return isFeatureEnabledSync('weeklyPlanner') ? (
+          <WeeklyPlanner ingredients={ingredients} recipes={recipes} />
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Fitur Rencana Mingguan tidak tersedia saat ini.</p>
+          </div>
+        );
       default:
-        return null;
+        return <IngredientManager />;
     }
   };
 
-  if (loading) {
+  if (loading || !featuresLoaded) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
