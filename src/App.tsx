@@ -10,21 +10,25 @@ import { RAGRecommendations } from './components/RAGRecommendations';
 import { WeeklyPlanner } from './components/WeeklyPlanner';
 import { AuthForm } from './components/AuthForm';
 import { Toast } from './components/Toast';
+import { UserProfileModal } from './components/UserProfileModal';
 import { useAuth } from './hooks/useAuth';
 import { useIngredients } from './hooks/useIngredients';
 import { useRecipes } from './hooks/useRecipes';
+import { useUserProfile } from './hooks/useUserProfile';
 import { useToast } from './hooks/useToast';
 import { signOut } from './lib/supabase';
 import { isFeatureEnabledSync, preloadFeatureFlags } from './lib/featureFlags';
-import { LogOut } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 
 function App() {
   const { user, loading } = useAuth();
+  const { profile } = useUserProfile(user?.id);
   const { ingredients } = useIngredients(user?.id);
   const { recipes } = useRecipes(user?.id);
   const { toasts, showSuccess, showError, hideToast } = useToast();
   const [activeTab, setActiveTab] = useState('ingredients');
   const [featuresLoaded, setFeaturesLoaded] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Preload feature flags on app start
   useEffect(() => {
@@ -38,6 +42,13 @@ function App() {
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const getDisplayName = () => {
+    if (profile?.username) {
+      return profile.username;
+    }
+    return user?.email || 'Pengguna';
   };
 
   const renderActiveTab = () => {
@@ -122,15 +133,26 @@ function App() {
       <Header />
       <div className="flex items-center justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
         <div className="text-sm text-gray-600">
-          Selamat datang, {user.email}
+          Selamat datang, <span className="font-medium">{getDisplayName()}</span>
         </div>
-        <button
-          onClick={handleSignOut}
-          className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
-        >
-          <LogOut size={16} />
-          Keluar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowProfileModal(true)}
+            className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
+            title="Pengaturan Profil"
+          >
+            <Settings size={16} />
+            Profil
+          </button>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
+            title="Keluar"
+          >
+            <LogOut size={16} />
+            Keluar
+          </button>
+        </div>
       </div>
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
       
@@ -141,6 +163,18 @@ function App() {
 
       {/* Footer */}
       <Footer />
+
+      {/* User Profile Modal */}
+      {user && (
+        <UserProfileModal
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          userId={user.id}
+          userEmail={user.email || ''}
+          onSuccess={showSuccess}
+          onError={showError}
+        />
+      )}
 
       {/* Toast notifications */}
       {toasts.map((toast) => (
