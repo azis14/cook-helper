@@ -30,14 +30,24 @@ class RAGRecipeService {
   private embeddingService: EmbeddingService;
   private geminiService: GeminiService | null = null;
   private isInitialized = false;
+  private aiAvailable = false;
 
   constructor() {
     this.embeddingService = new EmbeddingService();
     
     // Initialize Gemini service if API key is available
     const apiKey = import.meta.env.VITE_GOOGLE_AI_API_KEY;
-    if (apiKey) {
-      this.geminiService = new GeminiService(apiKey);
+    if (apiKey && apiKey.trim() && apiKey !== 'your_api_key_here') {
+      try {
+        this.geminiService = new GeminiService(apiKey);
+        this.aiAvailable = true;
+      } catch (error) {
+        console.warn('Failed to initialize Gemini service:', error);
+        this.aiAvailable = false;
+      }
+    } else {
+      console.warn('Google AI API key not found or invalid. RAG service will work with limited functionality.');
+      this.aiAvailable = false;
     }
   }
 
@@ -92,7 +102,14 @@ class RAGRecipeService {
     try {
       // Create query embedding from user ingredients
       const queryContent = this.embeddingService.createQueryContent(ingredients);
-      const queryEmbedding = await this.embeddingService.generateEmbedding(queryContent);
+      let queryEmbedding: number[];
+      
+      try {
+        queryEmbedding = await this.embeddingService.generateEmbedding(queryContent);
+      } catch (embeddingError) {
+        console.warn('Failed to generate embedding, falling back to traditional method:', embeddingError);
+        return this.getFallbackRecommendations(ingredients, options);
+      }
 
       // Use Supabase's vector similarity search with increased limit
       const { data: similarRecipes, error } = await supabase.rpc('find_similar_recipes', {
@@ -115,11 +132,19 @@ class RAGRecipeService {
 
       console.log(`Vector search returned ${similarRecipes.length} recipes`);
 
-      // Process results with AI if available, otherwise use traditional conversion
+      // Process results with AI if available and working, otherwise use traditional conversion
       let recommendations: RAGRecipeRecommendation[];
       
-      if (this.geminiService && similarRecipes.length > 0) {
-        recommendations = await this.processWithAI(similarRecipes, ingredients, maxResults);
+      if (this.aiAvailable && this.geminiService && similarRecipes.length > 0) {
+        try {
+          recommendations = await this.processWithAI(similarRecipes, ingredients, maxResults);
+        } catch (aiError) {
+          console.warn('AI processing failed, falling back to traditional method:', aiError);
+          this.aiAvailable = false; // Disable AI for subsequent calls
+          recommendations = similarRecipes
+            .slice(0, maxResults)
+            .map((result: any) => this.convertToRecommendation(result, ingredients));
+        }
       } else {
         recommendations = similarRecipes
           .slice(0, maxResults)
@@ -143,6 +168,10 @@ class RAGRecipeService {
     userIngredients: Ingredient[],
     maxResults: number
   ): Promise<RAGRecipeRecommendation[]> {
+    if (!this.geminiService || !this.aiAvailable) {
+      throw new Error('AI service not available');
+    }
+
     try {
       const ingredientList = userIngredients.map(ing => 
         `${ing.name} (${ing.quantity} ${ing.unit})`
@@ -157,17 +186,18 @@ class RAGRecipeService {
         const remainingSlots = maxResults - allRecommendations.length;
         const batchMaxResults = Math.min(remainingSlots, batchSize);
 
-        // Prepare recipe references for AI
-        const recipeReferences = batch.map((result, index) => ({
-          index: index + 1,
-          title: result.title,
-          ingredients: result.ingredients,
-          steps: result.steps,
-          loves_count: result.loves_count,
-          similarity_score: result.similarity_score
-        }));
+        try {
+          // Prepare recipe references for AI
+          const recipeReferences = batch.map((result, index) => ({
+            index: index + 1,
+            title: result.title,
+            ingredients: result.ingredients,
+            steps: result.steps,
+            loves_count: result.loves_count,
+            similarity_score: result.similarity_score
+          }));
 
-        const prompt = `
+          const prompt = `
 Saya memiliki bahan-bahan berikut: ${ingredientList}
 
 Berdasarkan hasil pencarian vektor berikut, tolong pilih dan format ${batchMaxResults} resep terbaik yang paling cocok dengan bahan saya. Berikan respon dalam format JSON yang valid dengan struktur berikut:
@@ -226,8 +256,7 @@ Pastikan:
 12. Gunakan bahasa Indonesia yang baik dan benar
 `;
 
-        try {
-          const result = await this.geminiService!.generateContent(prompt);
+          const result = await this.geminiService.generateContent(prompt);
           const response = await result.response;
           const text = response.text();
 
@@ -242,11 +271,19 @@ Pastikan:
             continue;
           }
 
-          const parsedResponse = JSON.parse(jsonMatch[1]);
-          const batchRecommendations = this.convertAIResponseToRecommendations(parsedResponse, batch, userIngredients);
-          allRecommendations.push(...batchRecommendations.slice(0, batchMaxResults));
-        } catch (parseError) {
-          console.error('JSON parsing error for batch:', parseError);
+          try {
+            const parsedResponse = JSON.parse(jsonMatch[1]);
+            const batchRecommendations = this.convertAIResponseToRecommendations(parsedResponse, batch, userIngredients);
+            allRecommendations.push(...batchRecommendations.slice(0, batchMaxResults));
+          } catch (parseError) {
+            console.warn('JSON parsing error for batch, using fallback:', parseError);
+            const fallbackBatch = batch
+              .slice(0, batchMaxResults)
+              .map((result: any) => this.convertToRecommendation(result, userIngredients));
+            allRecommendations.push(...fallbackBatch);
+          }
+        } catch (batchError) {
+          console.warn('Error processing batch with AI, using fallback:', batchError);
           // Fallback to traditional method for this batch
           const fallbackBatch = batch
             .slice(0, batchMaxResults)
@@ -263,10 +300,9 @@ Pastikan:
       return allRecommendations.slice(0, maxResults);
     } catch (error) {
       console.error('Error processing with AI:', error);
-      // Fallback to traditional method
-      return vectorResults
-        .slice(0, maxResults)
-        .map((result: any) => this.convertToRecommendation(result, userIngredients));
+      // Mark AI as unavailable and throw to trigger fallback
+      this.aiAvailable = false;
+      throw error;
     }
   }
 
@@ -411,7 +447,14 @@ Pastikan:
     const { maxResults = 20, minSimilarity = 0.3 } = options;
 
     try {
-      const queryEmbedding = await this.embeddingService.generateEmbedding(query);
+      let queryEmbedding: number[];
+      
+      try {
+        queryEmbedding = await this.embeddingService.generateEmbedding(query);
+      } catch (embeddingError) {
+        console.warn('Failed to generate embedding for semantic search, falling back:', embeddingError);
+        return this.getFallbackSemanticSearch(query, options);
+      }
 
       // Use Supabase's vector similarity search
       const { data: similarRecipes, error } = await supabase.rpc('search_recipes_by_text', {
@@ -428,8 +471,13 @@ Pastikan:
       if (!similarRecipes) return [];
 
       // Process with AI if available
-      if (this.geminiService && similarRecipes.length > 0) {
-        return this.processSemanticSearchWithAI(similarRecipes, query, maxResults);
+      if (this.aiAvailable && this.geminiService && similarRecipes.length > 0) {
+        try {
+          return await this.processSemanticSearchWithAI(similarRecipes, query, maxResults);
+        } catch (aiError) {
+          console.warn('AI processing failed for semantic search, using traditional method:', aiError);
+          this.aiAvailable = false;
+        }
       }
 
       return similarRecipes
@@ -449,6 +497,10 @@ Pastikan:
     query: string,
     maxResults: number
   ): Promise<RAGRecipeRecommendation[]> {
+    if (!this.geminiService || !this.aiAvailable) {
+      throw new Error('AI service not available');
+    }
+
     try {
       const recipeReferences = vectorResults.slice(0, Math.min(vectorResults.length, 6)).map((result, index) => ({
         index: index + 1,
@@ -495,7 +547,7 @@ Format dalam JSON yang sama seperti sebelumnya, fokus pada resep yang paling rel
 \`\`\`
 `;
 
-      const result = await this.geminiService!.generateContent(prompt);
+      const result = await this.geminiService.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
 
@@ -510,9 +562,7 @@ Format dalam JSON yang sama seperti sebelumnya, fokus pada resep yang paling rel
       return this.convertAIResponseToRecommendations(parsedResponse, vectorResults, []);
     } catch (error) {
       console.error('Error processing semantic search with AI:', error);
-      return vectorResults
-        .slice(0, maxResults)
-        .map((result: any) => this.convertToRecommendation(result, []));
+      throw error;
     }
   }
 
@@ -566,6 +616,13 @@ Format dalam JSON yang sama seperti sebelumnya, fokus pada resep yang paling rel
       console.error('Error triggering background sync:', error);
       return { success: false, message: 'Failed to trigger background sync' };
     }
+  }
+
+  /**
+   * Check if AI features are available
+   */
+  isAIAvailable(): boolean {
+    return this.aiAvailable;
   }
 
   private convertToRecommendation(
