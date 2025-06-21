@@ -367,14 +367,12 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
           {recommendations.map((recipe) => (
             <div
               key={recipe.id}
-              className="bg-white rounded-lg shadow-md border border-purple-100 overflow-hidden hover:shadow-lg transition-shadow"
+              className="bg-white rounded-lg shadow-md border border-purple-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => handleCardClick(recipe)}
             >
               <div className="p-4">
                 <div className="flex items-start justify-between mb-3">
-                  <h3 
-                    className="font-semibold text-gray-900 text-lg line-clamp-2 cursor-pointer hover:text-purple-600 transition-colors"
-                    onClick={() => handleCardClick(recipe)}
-                  >
+                  <h3 className="font-semibold text-gray-900 text-lg line-clamp-2">
                     {recipe.name}
                   </h3>
                   <div className="flex items-center gap-1 ml-2">
@@ -497,7 +495,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
 
                 {/* Click hint */}
                 <div className="text-xs text-gray-400 text-center">
-                  Klik judul untuk melihat detail lengkap
+                  Klik kartu untuk melihat detail lengkap
                 </div>
               </div>
             </div>
