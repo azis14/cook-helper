@@ -20,23 +20,6 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
     });
   }, []);
 
-  // Don't render navigation until features are loaded to prevent flickering
-  if (!featuresLoaded) {
-    return (
-      <nav className="bg-white shadow-sm border-b border-orange-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8 overflow-x-auto h-16 items-center">
-            <div className="animate-pulse flex space-x-8">
-              <div className="h-4 bg-gray-200 rounded w-16"></div>
-              <div className="h-4 bg-gray-200 rounded w-16"></div>
-              <div className="h-4 bg-gray-200 rounded w-20"></div>
-            </div>
-          </div>
-        </div>
-      </nav>
-    );
-  }
-
   // Define all possible tabs
   const allTabs = [
     { id: 'ingredients', label: 'Bahan', icon: Package, feature: null },
@@ -59,6 +42,23 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
       onTabChange(tabs[0]?.id || 'ingredients');
     }
   }, [featuresLoaded, activeTab, tabs, onTabChange]);
+
+  // Don't render navigation until features are loaded to prevent flickering
+  if (!featuresLoaded) {
+    return (
+      <nav className="bg-white shadow-sm border-b border-orange-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-8 overflow-x-auto h-16 items-center">
+            <div className="animate-pulse flex space-x-8">
+              <div className="h-4 bg-gray-200 rounded w-16"></div>
+              <div className="h-4 bg-gray-200 rounded w-16"></div>
+              <div className="h-4 bg-gray-200 rounded w-20"></div>
+            </div>
+          </div>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav className="bg-white shadow-sm border-b border-orange-100">
