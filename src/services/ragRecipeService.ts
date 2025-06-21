@@ -254,6 +254,9 @@ Pastikan:
 10. Urutkan berdasarkan kesesuaian dengan bahan yang tersedia
 11. Jika bahan yang diperlukan hanya secukupnya, gunakan "secukupnya" sebagai unit dan null untuk quantity
 12. Gunakan bahasa Indonesia yang baik dan benar
+13. TIDAK ADA komentar dalam output JSON
+14. Semua string dalam tanda kutip ganda
+15. Tidak ada koma trailing
 `;
 
           const result = await this.geminiService.generateContent(prompt);
@@ -272,7 +275,19 @@ Pastikan:
           }
 
           try {
-            const parsedResponse = JSON.parse(jsonMatch[1]);
+            // Clean the JSON string to remove any potential comments or invalid characters
+            let jsonString = jsonMatch[1];
+            
+            // Remove any line comments (// ...)
+            jsonString = jsonString.replace(/\/\/.*$/gm, '');
+            
+            // Remove any block comments (/* ... */)
+            jsonString = jsonString.replace(/\/\*[\s\S]*?\*\//g, '');
+            
+            // Remove trailing commas
+            jsonString = jsonString.replace(/,(\s*[}\]])/g, '$1');
+            
+            const parsedResponse = JSON.parse(jsonString);
             const batchRecommendations = this.convertAIResponseToRecommendations(parsedResponse, batch, userIngredients);
             allRecommendations.push(...batchRecommendations.slice(0, batchMaxResults));
           } catch (parseError) {
@@ -530,13 +545,22 @@ Format dalam JSON yang sama seperti sebelumnya, fokus pada resep yang paling rel
       "referenceIndex": 1,
       "name": "Nama Resep",
       "description": "Deskripsi menarik",
-      "ingredients": [...],
-      "instructions": [...],
+      "ingredients": [
+        {
+          "name": "nama bahan",
+          "quantity": 1,
+          "unit": "satuan"
+        }
+      ],
+      "instructions": [
+        "Langkah 1",
+        "Langkah 2"
+      ],
       "prepTime": 15,
       "cookTime": 30,
       "servings": 4,
       "difficulty": "easy",
-      "tags": [...],
+      "tags": ["tag1", "tag2"],
       "relevanceReasons": [
         "Relevan dengan pencarian '${query}'",
         "Alasan lainnya"
@@ -545,6 +569,13 @@ Format dalam JSON yang sama seperti sebelumnya, fokus pada resep yang paling rel
   ]
 }
 \`\`\`
+
+PENTING:
+1. JSON format yang valid
+2. TIDAK ADA komentar dalam output JSON
+3. Semua string dalam tanda kutip ganda
+4. Tidak ada koma trailing
+5. Tidak ada karakter khusus yang merusak JSON
 `;
 
       const result = await this.geminiService.generateContent(prompt);
@@ -558,8 +589,27 @@ Format dalam JSON yang sama seperti sebelumnya, fokus pada resep yang paling rel
           .map((result: any) => this.convertToRecommendation(result, []));
       }
 
-      const parsedResponse = JSON.parse(jsonMatch[1]);
-      return this.convertAIResponseToRecommendations(parsedResponse, vectorResults, []);
+      try {
+        // Clean the JSON string to remove any potential comments or invalid characters
+        let jsonString = jsonMatch[1];
+        
+        // Remove any line comments (// ...)
+        jsonString = jsonString.replace(/\/\/.*$/gm, '');
+        
+        // Remove any block comments (/* ... */)
+        jsonString = jsonString.replace(/\/\*[\s\S]*?\*\//g, '');
+        
+        // Remove trailing commas
+        jsonString = jsonString.replace(/,(\s*[}\]])/g, '$1');
+        
+        const parsedResponse = JSON.parse(jsonString);
+        return this.convertAIResponseToRecommendations(parsedResponse, vectorResults, []);
+      } catch (parseError) {
+        console.error('JSON parsing error in semantic search:', parseError);
+        return vectorResults
+          .slice(0, maxResults)
+          .map((result: any) => this.convertToRecommendation(result, []));
+      }
     } catch (error) {
       console.error('Error processing semantic search with AI:', error);
       throw error;
