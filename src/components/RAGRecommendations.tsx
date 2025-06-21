@@ -22,7 +22,6 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
   const [ragService] = useState(() => new RAGRecipeService());
   const [recommendations, setRecommendations] = useState<RAGRecipeRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<RAGRecipeRecommendation | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,32 +63,18 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
     localStorage.setItem('saved-rag-recipe-ids', JSON.stringify(Array.from(savedRecipeIds)));
   }, [savedRecipeIds]);
 
+  // Initialize service silently in the background
   useEffect(() => {
-    initializeService();
+    ragService.initialize().catch(error => {
+      console.error('RAG initialization error:', error);
+    });
   }, []);
 
-  // Only auto-search when ingredients change, not when filters change
-  useEffect(() => {
-    if (ingredients.length > 0 && !searchQuery) {
-      generateRAGRecommendations();
-    }
-  }, [ingredients]);
-
-  const initializeService = async () => {
-    setIsInitializing(true);
-    try {
-      await ragService.initialize();
-      showSuccess('Sistem RAG berhasil diinisialisasi!');
-    } catch (error) {
-      showError('Gagal menginisialisasi sistem RAG');
-      console.error('RAG initialization error:', error);
-    } finally {
-      setIsInitializing(false);
-    }
-  };
-
   const generateRAGRecommendations = async () => {
-    if (ingredients.length === 0) return;
+    if (ingredients.length === 0) {
+      showError('Tambahkan bahan-bahan terlebih dahulu untuk mendapatkan rekomendasi');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -119,6 +104,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
       if (ingredients.length > 0) {
         generateRAGRecommendations();
       } else {
+        showError('Masukkan kata kunci pencarian atau tambahkan bahan-bahan');
         setRecommendations([]);
       }
       return;
@@ -132,7 +118,11 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
       });
       
       setRecommendations(searchResults);
-      showSuccess(`Ditemukan ${searchResults.length} hasil pencarian semantik!`);
+      if (searchResults.length > 0) {
+        showSuccess(`Ditemukan ${searchResults.length} hasil pencarian semantik!`);
+      } else {
+        showError('Tidak ada resep yang cocok dengan kata kunci pencarian');
+      }
     } catch (error) {
       showError('Gagal melakukan pencarian semantik');
       console.error('Semantic search error:', error);
@@ -146,6 +136,8 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
       handleSemanticSearch();
     } else if (ingredients.length > 0) {
       generateRAGRecommendations();
+    } else {
+      showError('Masukkan kata kunci pencarian atau tambahkan bahan-bahan');
     }
   };
 
@@ -225,12 +217,6 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
             Rekomendasi resep menggunakan AI semantik dan embedding dengan pemrosesan AI
           </p>
         </div>
-        {isInitializing && (
-          <div className="flex items-center gap-2 text-purple-600">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
-            <span className="text-sm">Menginisialisasi AI...</span>
-          </div>
-        )}
       </div>
 
       {/* RAG Status & Info */}
@@ -271,7 +257,8 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
               />
               <button
                 onClick={handleSemanticSearch}
-                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                disabled={isLoading}
+                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:bg-purple-400 disabled:cursor-not-allowed"
               >
                 <Search size={18} />
               </button>
@@ -301,9 +288,10 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
             
             <button
               onClick={handleSearchWithFilters}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              disabled={isLoading}
+              className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
             >
-              Terapkan Filter & Cari
+              {isLoading ? 'Mencari...' : 'Terapkan Filter & Cari'}
             </button>
           </div>
         </div>
@@ -317,11 +305,24 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
         </div>
       )}
 
-      {/* No Ingredients Warning */}
-      {ingredients.length === 0 && !isLoading && !searchQuery && (
+      {/* No Search State */}
+      {recommendations.length === 0 && !isLoading && (
         <div className="text-center py-12">
           <Brain size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">Tambahkan bahan-bahan untuk mendapatkan rekomendasi RAG yang cerdas!</p>
+          <div className="space-y-2">
+            <p className="text-gray-500 font-medium">Siap untuk mencari resep dengan AI semantik!</p>
+            <p className="text-gray-400 text-sm">
+              Masukkan kata kunci pencarian atau gunakan bahan-bahan yang Anda miliki
+            </p>
+          </div>
+          <div className="mt-6 space-y-2">
+            <p className="text-sm text-gray-600 font-medium">Cara menggunakan:</p>
+            <div className="text-xs text-gray-500 space-y-1">
+              <p>• Ketik kata kunci seperti "makanan sehat" atau "masakan cepat"</p>
+              <p>• Atau biarkan kosong dan gunakan bahan-bahan dari tab Bahan</p>
+              <p>• Klik "Terapkan Filter & Cari" atau tekan Enter</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -475,16 +476,6 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* No Recommendations */}
-      {recommendations.length === 0 && !isLoading && (ingredients.length > 0 || searchQuery) && (
-        <div className="text-center py-12">
-          <ChefHat size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">
-            Tidak ada resep yang cocok dengan kriteria pencarian. Coba ubah filter atau tambah bahan lain.
-          </p>
         </div>
       )}
 
