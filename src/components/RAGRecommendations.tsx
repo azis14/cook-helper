@@ -31,8 +31,8 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
   const [savedRecipeIds, setSavedRecipeIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState({
     minSimilarity: 0.3,
-    maxResults: 12,
-    minLoves: 50,
+    maxResults: 20,
+    minLoves: 10,
   });
 
   const difficultyTranslations = {
@@ -262,17 +262,17 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
         </p>
       </div>
 
-      {/* Search and Filters */}
+      {/* Simplified Search */}
       <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
         <div className="flex items-center gap-2 mb-4">
-          <Filter size={20} className="text-gray-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Pencarian Semantik & Filter</h3>
+          <Search size={20} className="text-gray-600" />
+          <h3 className="text-lg font-semibold text-gray-900">Pencarian Semantik</h3>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
+        <div className="flex gap-4">
+          <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Pencarian Semantik
+              Cari berdasarkan makna atau deskripsi
             </label>
             <div className="flex gap-2">
               <input
@@ -291,56 +291,25 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Contoh: "makanan pedas indonesia", "resep sehat rendah kalori"
+              Contoh: "makanan pedas indonesia", "resep sehat rendah kalori", "masakan cepat saji"
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Min. Kemiripan
-              </label>
-              <select
-                value={filters.minSimilarity}
-                onChange={(e) => setFilters(prev => ({ ...prev, minSimilarity: parseFloat(e.target.value) }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-              >
-                <option value={0.2}>20% (Longgar)</option>
-                <option value={0.3}>30% (Normal)</option>
-                <option value={0.4}>40% (Ketat)</option>
-                <option value={0.5}>50% (Sangat Ketat)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Min. Likes
-              </label>
-              <select
-                value={filters.minLoves}
-                onChange={(e) => setFilters(prev => ({ ...prev, minLoves: parseInt(e.target.value) }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-              >
-                <option value={10}>10+</option>
-                <option value={50}>50+</option>
-                <option value={100}>100+</option>
-                <option value={500}>500+</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Max. Hasil
-              </label>
-              <select
-                value={filters.maxResults}
-                onChange={(e) => setFilters(prev => ({ ...prev, maxResults: parseInt(e.target.value) }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-              >
-                <option value={6}>6 resep</option>
-                <option value={12}>12 resep</option>
-                <option value={18}>18 resep</option>
-                <option value={24}>24 resep</option>
-              </select>
-            </div>
+          <div className="w-48">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Minimum Kemiripan
+            </label>
+            <select
+              value={filters.minSimilarity}
+              onChange={(e) => setFilters(prev => ({ ...prev, minSimilarity: parseFloat(e.target.value) }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value={0.2}>20% (Sangat Longgar)</option>
+              <option value={0.3}>30% (Longgar)</option>
+              <option value={0.4}>40% (Normal)</option>
+              <option value={0.5}>50% (Ketat)</option>
+              <option value={0.6}>60% (Sangat Ketat)</option>
+            </select>
           </div>
         </div>
       </div>
@@ -363,143 +332,154 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
 
       {/* Recommendations */}
       {recommendations.length > 0 && !isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {recommendations.map((recipe) => (
-            <div
-              key={recipe.id}
-              className="bg-white rounded-lg shadow-md border border-purple-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => handleCardClick(recipe)}
-            >
-              <div className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-semibold text-gray-900 text-lg line-clamp-2">
-                    {recipe.name}
-                  </h3>
-                  <div className="flex items-center gap-1 ml-2">
-                    {getConfidenceIcon(recipe.confidence_score)}
-                    <span className="text-xs font-medium text-gray-600">
-                      {Math.round(recipe.confidence_score * 100)}%
-                    </span>
-                    {isAIProcessed(recipe) && (
-                      <Sparkles className="text-purple-500 ml-1" size={14} />
-                    )}
-                  </div>
-                </div>
-                
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{recipe.description}</p>
-                
-                {/* AI Processing Badge */}
-                {isAIProcessed(recipe) && (
-                  <div className="mb-3">
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">
-                      <Sparkles size={12} />
-                      Diproses AI
-                    </span>
-                  </div>
-                )}
-                
-                {/* Similarity Score */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSimilarityColor(recipe.similarity_score)}`}>
-                      {Math.round(recipe.similarity_score * 100)}% match
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {recipe.loves_count.toLocaleString()} ❤️
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Recipe Info */}
-                <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                  <div className="flex items-center gap-1">
-                    <Clock size={14} />
-                    <span>{recipe.prep_time + recipe.cook_time} menit</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Users size={14} />
-                    <span>{recipe.servings} porsi</span>
-                  </div>
-                  <span className={`px-2 py-1 rounded-full text-xs ${difficultyColors[recipe.difficulty]}`}>
-                    {difficultyTranslations[recipe.difficulty]}
-                  </span>
-                </div>
-                
-                {/* Relevance Reasons */}
-                <div className="mb-3">
-                  <h4 className="font-medium text-gray-900 mb-2 text-sm">Mengapa direkomendasikan:</h4>
-                  <ul className="text-xs text-gray-600 space-y-1">
-                    {recipe.relevance_reasons.slice(0, 2).map((reason, index) => (
-                      <li key={index} className="flex items-start gap-1">
-                        <span className="text-purple-500 mt-0.5">•</span>
-                        <span className="line-clamp-1">{reason}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Ingredients Preview */}
-                <div className="mb-3">
-                  <h4 className="font-medium text-gray-900 mb-2 text-sm">Bahan-bahan:</h4>
-                  <ul className="text-xs text-gray-600 space-y-1">
-                    {(recipe.recipe_ingredients || []).slice(0, 3).map((ingredient, index) => (
-                      <li key={index} className="line-clamp-1">• {ingredient.name}</li>
-                    ))}
-                    {(recipe.recipe_ingredients || []).length > 3 && (
-                      <li className="text-gray-500">+ {(recipe.recipe_ingredients || []).length - 3} bahan lainnya</li>
-                    )}
-                  </ul>
-                </div>
-
-                {/* Tags */}
-                {recipe.tags && recipe.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {recipe.tags.slice(0, 3).map((tag, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded-full"
-                      >
-                        #{tag}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Ditemukan {recommendations.length} resep yang relevan
+            </h3>
+            <div className="text-sm text-gray-500">
+              Menampilkan hingga 20 resep terbaik
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {recommendations.map((recipe) => (
+              <div
+                key={recipe.id}
+                className="bg-white rounded-lg shadow-md border border-purple-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => handleCardClick(recipe)}
+              >
+                <div className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className="font-semibold text-gray-900 text-lg line-clamp-2">
+                      {recipe.name}
+                    </h3>
+                    <div className="flex items-center gap-1 ml-2">
+                      {getConfidenceIcon(recipe.confidence_score)}
+                      <span className="text-xs font-medium text-gray-600">
+                        {Math.round(recipe.confidence_score * 100)}%
                       </span>
-                    ))}
+                      {isAIProcessed(recipe) && (
+                        <Sparkles className="text-purple-500 ml-1" size={14} />
+                      )}
+                    </div>
                   </div>
-                )}
-
-                {/* Save Recipe Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    saveRecipeToCollection(recipe);
-                  }}
-                  disabled={savingRecipeId === recipe.id || isRecipeSaved(recipe)}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors mb-2 ${
-                    isRecipeSaved(recipe)
-                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-                      : savingRecipeId === recipe.id
-                      ? 'bg-gray-400 text-white cursor-not-allowed'
-                      : 'bg-green-500 text-white hover:bg-green-600'
-                  }`}
-                >
-                  {isRecipeSaved(recipe) ? (
-                    <>
-                      <Check size={16} />
-                      Sudah Disimpan
-                    </>
-                  ) : (
-                    <>
-                      <Save size={16} />
-                      {savingRecipeId === recipe.id ? 'Menyimpan...' : 'Simpan Resep'}
-                    </>
+                  
+                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{recipe.description}</p>
+                  
+                  {/* AI Processing Badge */}
+                  {isAIProcessed(recipe) && (
+                    <div className="mb-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">
+                        <Sparkles size={12} />
+                        Diproses AI
+                      </span>
+                    </div>
                   )}
-                </button>
+                  
+                  {/* Similarity Score */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSimilarityColor(recipe.similarity_score)}`}>
+                        {Math.round(recipe.similarity_score * 100)}% match
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {recipe.loves_count.toLocaleString()} ❤️
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Recipe Info */}
+                  <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
+                    <div className="flex items-center gap-1">
+                      <Clock size={14} />
+                      <span>{recipe.prep_time + recipe.cook_time} menit</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users size={14} />
+                      <span>{recipe.servings} porsi</span>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs ${difficultyColors[recipe.difficulty]}`}>
+                      {difficultyTranslations[recipe.difficulty]}
+                    </span>
+                  </div>
+                  
+                  {/* Relevance Reasons */}
+                  <div className="mb-3">
+                    <h4 className="font-medium text-gray-900 mb-2 text-sm">Mengapa direkomendasikan:</h4>
+                    <ul className="text-xs text-gray-600 space-y-1">
+                      {recipe.relevance_reasons.slice(0, 2).map((reason, index) => (
+                        <li key={index} className="flex items-start gap-1">
+                          <span className="text-purple-500 mt-0.5">•</span>
+                          <span className="line-clamp-1">{reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
-                {/* Click hint */}
-                <div className="text-xs text-gray-400 text-center">
-                  Klik kartu untuk melihat detail lengkap
+                  {/* Ingredients Preview */}
+                  <div className="mb-3">
+                    <h4 className="font-medium text-gray-900 mb-2 text-sm">Bahan-bahan:</h4>
+                    <ul className="text-xs text-gray-600 space-y-1">
+                      {(recipe.recipe_ingredients || []).slice(0, 3).map((ingredient, index) => (
+                        <li key={index} className="line-clamp-1">• {ingredient.name}</li>
+                      ))}
+                      {(recipe.recipe_ingredients || []).length > 3 && (
+                        <li className="text-gray-500">+ {(recipe.recipe_ingredients || []).length - 3} bahan lainnya</li>
+                      )}
+                    </ul>
+                  </div>
+
+                  {/* Tags */}
+                  {recipe.tags && recipe.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {recipe.tags.slice(0, 3).map((tag, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded-full"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Save Recipe Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      saveRecipeToCollection(recipe);
+                    }}
+                    disabled={savingRecipeId === recipe.id || isRecipeSaved(recipe)}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors mb-2 ${
+                      isRecipeSaved(recipe)
+                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                        : savingRecipeId === recipe.id
+                        ? 'bg-gray-400 text-white cursor-not-allowed'
+                        : 'bg-green-500 text-white hover:bg-green-600'
+                    }`}
+                  >
+                    {isRecipeSaved(recipe) ? (
+                      <>
+                        <Check size={16} />
+                        Sudah Disimpan
+                      </>
+                    ) : (
+                      <>
+                        <Save size={16} />
+                        {savingRecipeId === recipe.id ? 'Menyimpan...' : 'Simpan Resep'}
+                      </>
+                    )}
+                  </button>
+
+                  {/* Click hint */}
+                  <div className="text-xs text-gray-400 text-center">
+                    Klik kartu untuk melihat detail lengkap
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
