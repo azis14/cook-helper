@@ -241,6 +241,18 @@ ${ref.index}. ${ref.title} (${ref.loves_count} likes, ${Math.round(ref.similarit
 }
 \`\`\`
 
+PENTING - ATURAN JSON YANG KETAT:
+1. JSON format yang valid tanpa kesalahan sintaks
+2. TIDAK ADA komentar dalam output JSON (tidak boleh ada // atau /* */)
+3. Semua string dalam tanda kutip ganda
+4. Semua angka tanpa tanda kutip
+5. Tidak ada koma trailing
+6. Tidak ada karakter khusus yang merusak JSON
+7. Tidak ada baris kosong atau spasi berlebihan dalam JSON
+8. Hanya output JSON murni tanpa teks tambahan
+9. Pastikan semua kurung kurawal dan kurung siku tertutup dengan benar
+10. Gunakan escape sequence yang benar untuk karakter khusus dalam string
+
 Pastikan:
 1. Pilih resep dengan similarity score tertinggi dan paling cocok dengan bahan yang tersedia
 2. Perbaiki nama resep agar lebih menarik dan jelas
@@ -250,13 +262,9 @@ Pastikan:
 6. Estimasi waktu yang realistis
 7. Tentukan tingkat kesulitan yang sesuai
 8. Berikan alasan relevansi yang spesifik
-9. JSON format yang valid tanpa komentar
-10. Urutkan berdasarkan kesesuaian dengan bahan yang tersedia
-11. Jika bahan yang diperlukan hanya secukupnya, gunakan "secukupnya" sebagai unit dan null untuk quantity
-12. Gunakan bahasa Indonesia yang baik dan benar
-13. TIDAK ADA komentar dalam output JSON
-14. Semua string dalam tanda kutip ganda
-15. Tidak ada koma trailing
+9. Urutkan berdasarkan kesesuaian dengan bahan yang tersedia
+10. Jika bahan yang diperlukan hanya secukupnya, gunakan "secukupnya" sebagai unit dan null untuk quantity
+11. Gunakan bahasa Indonesia yang baik dan benar
 `;
 
           const result = await this.geminiService.generateContent(prompt);
@@ -275,7 +283,7 @@ Pastikan:
           }
 
           try {
-            // Clean the JSON string to remove any potential comments or invalid characters
+            // Enhanced JSON cleaning to remove any potential comments or invalid characters
             let jsonString = jsonMatch[1];
             
             // Remove any line comments (// ...)
@@ -284,8 +292,17 @@ Pastikan:
             // Remove any block comments (/* ... */)
             jsonString = jsonString.replace(/\/\*[\s\S]*?\*\//g, '');
             
-            // Remove trailing commas
+            // Remove trailing commas before closing brackets/braces
             jsonString = jsonString.replace(/,(\s*[}\]])/g, '$1');
+            
+            // Remove any HTML-style comments
+            jsonString = jsonString.replace(/<!--[\s\S]*?-->/g, '');
+            
+            // Clean up any malformed strings or extra characters
+            jsonString = jsonString.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+            
+            // Ensure proper string escaping
+            jsonString = jsonString.replace(/\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})/g, '\\\\');
             
             const parsedResponse = JSON.parse(jsonString);
             const batchRecommendations = this.convertAIResponseToRecommendations(parsedResponse, batch, userIngredients);
@@ -570,12 +587,19 @@ Format dalam JSON yang sama seperti sebelumnya, fokus pada resep yang paling rel
 }
 \`\`\`
 
-PENTING:
-1. JSON format yang valid
-2. TIDAK ADA komentar dalam output JSON
+PENTING - ATURAN JSON YANG KETAT:
+1. JSON format yang valid tanpa kesalahan sintaks
+2. TIDAK ADA komentar dalam output JSON (tidak boleh ada // atau /* */ atau komentar apapun)
 3. Semua string dalam tanda kutip ganda
-4. Tidak ada koma trailing
-5. Tidak ada karakter khusus yang merusak JSON
+4. Semua angka tanpa tanda kutip
+5. Tidak ada koma trailing
+6. Tidak ada karakter khusus yang merusak JSON
+7. Tidak ada baris kosong atau spasi berlebihan dalam JSON
+8. Hanya output JSON murni tanpa teks tambahan
+9. Pastikan semua kurung kurawal dan kurung siku tertutup dengan benar
+10. Gunakan escape sequence yang benar untuk karakter khusus dalam string
+11. Tidak boleh ada kata "Tambahkan" atau komentar lainnya dalam JSON
+12. Output harus berupa JSON yang bisa langsung di-parse tanpa error
 `;
 
       const result = await this.geminiService.generateContent(prompt);
@@ -590,7 +614,7 @@ PENTING:
       }
 
       try {
-        // Clean the JSON string to remove any potential comments or invalid characters
+        // Enhanced JSON cleaning to remove any potential comments or invalid characters
         let jsonString = jsonMatch[1];
         
         // Remove any line comments (// ...)
@@ -599,8 +623,21 @@ PENTING:
         // Remove any block comments (/* ... */)
         jsonString = jsonString.replace(/\/\*[\s\S]*?\*\//g, '');
         
-        // Remove trailing commas
+        // Remove trailing commas before closing brackets/braces
         jsonString = jsonString.replace(/,(\s*[}\]])/g, '$1');
+        
+        // Remove any HTML-style comments
+        jsonString = jsonString.replace(/<!--[\s\S]*?-->/g, '');
+        
+        // Clean up any malformed strings or extra characters
+        jsonString = jsonString.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+        
+        // Ensure proper string escaping
+        jsonString = jsonString.replace(/\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})/g, '\\\\');
+        
+        // Remove any Indonesian comments that might appear
+        jsonString = jsonString.replace(/\s*\/\/\s*Tambahk.*$/gm, '');
+        jsonString = jsonString.replace(/\s*\/\*\s*Tambahk[\s\S]*?\*\//g, '');
         
         const parsedResponse = JSON.parse(jsonString);
         return this.convertAIResponseToRecommendations(parsedResponse, vectorResults, []);
