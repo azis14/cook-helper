@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, Zap, TrendingUp, Search, Filter, Star, Clock, Users, ChefHat, Target, RefreshCw, Sparkles, Save, Check } from 'lucide-react';
+import { Brain, Zap, TrendingUp, Search, Filter, Star, Clock, Users, ChefHat, Target, Sparkles, Save, Check } from 'lucide-react';
 import RAGRecipeService, { RAGRecipeRecommendation } from '../services/ragRecipeService';
 import { Ingredient } from '../types';
 import { RecipeDetailModal } from './RecipeDetailModal';
@@ -23,7 +23,6 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
   const [recommendations, setRecommendations] = useState<RAGRecipeRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<RAGRecipeRecommendation | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,11 +68,12 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
     initializeService();
   }, []);
 
+  // Only auto-search when ingredients change, not when filters change
   useEffect(() => {
-    if (ingredients.length > 0) {
+    if (ingredients.length > 0 && !searchQuery) {
       generateRAGRecommendations();
     }
-  }, [ingredients, filters]);
+  }, [ingredients]);
 
   const initializeService = async () => {
     setIsInitializing(true);
@@ -115,7 +115,12 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
 
   const handleSemanticSearch = async () => {
     if (!searchQuery.trim()) {
-      generateRAGRecommendations();
+      // If search query is empty, search based on ingredients
+      if (ingredients.length > 0) {
+        generateRAGRecommendations();
+      } else {
+        setRecommendations([]);
+      }
       return;
     }
 
@@ -136,20 +141,11 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
     }
   };
 
-  const handleBackgroundSync = async () => {
-    setIsSyncing(true);
-    try {
-      const result = await ragService.triggerBackgroundSync();
-      if (result.success) {
-        showSuccess('Sinkronisasi embedding berhasil dijalankan!');
-      } else {
-        showError(`Gagal menjalankan sinkronisasi: ${result.message}`);
-      }
-    } catch (error) {
-      showError('Gagal menjalankan sinkronisasi embedding');
-      console.error('Background sync error:', error);
-    } finally {
-      setIsSyncing(false);
+  const handleSearchWithFilters = () => {
+    if (searchQuery.trim()) {
+      handleSemanticSearch();
+    } else if (ingredients.length > 0) {
+      generateRAGRecommendations();
     }
   };
 
@@ -229,22 +225,12 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
             Rekomendasi resep menggunakan AI semantik dan embedding dengan pemrosesan AI
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {isInitializing && (
-            <div className="flex items-center gap-2 text-purple-600">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
-              <span className="text-sm">Menginisialisasi AI...</span>
-            </div>
-          )}
-          <button
-            onClick={handleBackgroundSync}
-            disabled={isSyncing}
-            className="flex items-center gap-2 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
-          >
-            <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
-            {isSyncing ? 'Sinkronisasi...' : 'Sync Embeddings'}
-          </button>
-        </div>
+        {isInitializing && (
+          <div className="flex items-center gap-2 text-purple-600">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+            <span className="text-sm">Menginisialisasi AI...</span>
+          </div>
+        )}
       </div>
 
       {/* RAG Status & Info */}
@@ -262,15 +248,15 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
         </p>
       </div>
 
-      {/* Simplified Search */}
+      {/* Search and Filters */}
       <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
         <div className="flex items-center gap-2 mb-4">
           <Search size={20} className="text-gray-600" />
           <h3 className="text-lg font-semibold text-gray-900">Pencarian Semantik</h3>
         </div>
         
-        <div className="flex gap-4">
-          <div className="flex-1">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Cari berdasarkan makna atau deskripsi
             </label>
@@ -295,21 +281,30 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
             </p>
           </div>
 
-          <div className="w-48">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Minimum Kemiripan
-            </label>
-            <select
-              value={filters.minSimilarity}
-              onChange={(e) => setFilters(prev => ({ ...prev, minSimilarity: parseFloat(e.target.value) }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Minimum Kemiripan
+              </label>
+              <select
+                value={filters.minSimilarity}
+                onChange={(e) => setFilters(prev => ({ ...prev, minSimilarity: parseFloat(e.target.value) }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value={0.2}>20% (Sangat Longgar)</option>
+                <option value={0.3}>30% (Longgar)</option>
+                <option value={0.4}>40% (Normal)</option>
+                <option value={0.5}>50% (Ketat)</option>
+                <option value={0.6}>60% (Sangat Ketat)</option>
+              </select>
+            </div>
+            
+            <button
+              onClick={handleSearchWithFilters}
+              className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
             >
-              <option value={0.2}>20% (Sangat Longgar)</option>
-              <option value={0.3}>30% (Longgar)</option>
-              <option value={0.4}>40% (Normal)</option>
-              <option value={0.5}>50% (Ketat)</option>
-              <option value={0.6}>60% (Sangat Ketat)</option>
-            </select>
+              Terapkan Filter & Cari
+            </button>
           </div>
         </div>
       </div>
