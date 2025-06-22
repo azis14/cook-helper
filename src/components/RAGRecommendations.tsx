@@ -247,15 +247,8 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari berdasarkan makna: 'makanan sehat', 'masakan cepat', dll..."
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                onKeyPress={(e) => e.key === 'Enter' && handleSemanticSearch()}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearchWithFilters()}
               />
-              <button
-                onClick={handleSemanticSearch}
-                disabled={isLoading || !searchQuery.trim()}
-                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:bg-purple-400 disabled:cursor-not-allowed"
-              >
-                <Search size={18} />
-              </button>
             </div>
             <p className="text-xs text-gray-500 mt-1">
               Contoh: "makanan pedas indonesia", "resep sehat rendah kalori", "masakan cepat saji"
