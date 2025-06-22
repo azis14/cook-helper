@@ -48,7 +48,7 @@ export const Footer: React.FC = () => {
         <div className="mt-6 pt-6 border-t border-orange-200">
           <div className="text-center">
             <p className="text-xs text-gray-500">
-              Asisten Dapur - Aplikasi resep pintar untuk keluarga Indonesia
+              Cook Assistant - Aplikasi resep pintar untuk keluarga Indonesia
             </p>
             <p className="text-xs text-gray-400 mt-1">
               Dibuat dengan React, TypeScript, Supabase, dan AI
