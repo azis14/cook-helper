@@ -50,6 +50,15 @@ export function useWeeklyPlans(userId: string | undefined) {
     }
   };
 
+  // Helper function to check if a recipe should be saved to database
+  const isUserRecipe = (recipe: Recipe | null): boolean => {
+    if (!recipe) return false;
+    // Only save recipes that belong to the current user (have valid UUIDs and user_id matches)
+    return recipe.user_id === userId && 
+           typeof recipe.id === 'string' && 
+           recipe.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i) !== null;
+  };
+
   const saveWeeklyPlan = async (
     weekStart: string,
     dailyMeals: DailyMeals[],
@@ -77,13 +86,13 @@ export function useWeeklyPlans(userId: string | undefined) {
 
       if (planError) throw planError;
 
-      // Save daily meals
+      // Save daily meals - only include recipe IDs for user-owned recipes
       const dailyMealsToInsert: DailyMealInsert[] = dailyMeals.map(meal => ({
         weekly_plan_id: planData.id,
         date: meal.date,
-        breakfast_recipe_id: meal.breakfast?.id || null,
-        lunch_recipe_id: meal.lunch?.id || null,
-        dinner_recipe_id: meal.dinner?.id || null,
+        breakfast_recipe_id: isUserRecipe(meal.breakfast) ? meal.breakfast!.id : null,
+        lunch_recipe_id: isUserRecipe(meal.lunch) ? meal.lunch!.id : null,
+        dinner_recipe_id: isUserRecipe(meal.dinner) ? meal.dinner!.id : null,
       }));
 
       const { error: mealsError } = await supabase
