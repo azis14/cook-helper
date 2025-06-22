@@ -11,8 +11,8 @@ export const Header: React.FC = () => {
               <ChefHat className="text-orange-800" size={24} />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-orange-900">Asisten Dapur</h1>
-              <p className="text-sm text-orange-700">Pendamping memasak pintar untuk keluarga Indonesia</p>
+              <h1 className="text-xl font-bold text-orange-900">Cook Assistent</h1>
+              <p className="text-sm text-orange-700">Asisten memasak pintar untuk keluarga Indonesia</p>
             </div>
           </div>
         </div>
