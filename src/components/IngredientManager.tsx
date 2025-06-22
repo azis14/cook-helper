@@ -28,7 +28,7 @@ export const IngredientManager: React.FC = () => {
     expiry_date: '',
   });
 
-  const categories = ['vegetables', 'meat', 'dairy', 'grains', 'spices', 'fruits', 'seafood'];
+  const categories = ['vegetables', 'meat', 'seafood', 'dairy', 'fruits'];
   const units = ['kg', 'gram', 'liter', 'ml', 'piece', 'clove'];
 
   const categoryTranslations: Record<string, string> = {
