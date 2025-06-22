@@ -26,8 +26,8 @@ export const Footer: React.FC = () => {
             </a>
           </div>
 
-          {/* Buy Me Coffee Section */}
-          <div className="flex items-center gap-4">
+          {/* Buy Me Coffee Section - Stacked vertically */}
+          <div className="flex flex-col items-center gap-3">
             <span className="text-sm text-gray-600 font-medium">
               Suka dengan produknya?
             </span>
