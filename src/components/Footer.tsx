@@ -6,15 +6,17 @@ export const Footer: React.FC = () => {
     <footer className="bg-gradient-to-r from-orange-100 to-yellow-100 border-t border-orange-200 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Copyright Section */}
-          <div className="flex items-center gap-2 text-gray-700">
-            <span className="text-sm">
-              © 2025 Cooked with
-            </span>
-            <Heart className="text-red-500" size={16} />
-            <span className="text-sm">
-              by
-            </span>
+          {/* Copyright Section - Stacked vertically */}
+          <div className="flex flex-col items-center gap-2 text-gray-700">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">
+                © 2025 Cooked with
+              </span>
+              <Heart className="text-red-500" size={16} />
+              <span className="text-sm">
+                by
+              </span>
+            </div>
             <a
               href="https://azis14.my.id"
               target="_blank"
