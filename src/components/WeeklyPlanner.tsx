@@ -800,82 +800,6 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
               </div>
             ))}
           </div>
-
-          {shoppingList.length > 0 && (
-            <div className="bg-white rounded-lg shadow-md border border-green-100 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <ShoppingCart className="text-green-600" size={24} />
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Daftar Belanja Optimal untuk {peopleCount} Orang
-                </h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <h4 className="font-medium text-green-800 mb-2 flex items-center gap-2">
-                    <Plus className="text-green-600" size={16} />
-                    Perlu Dibeli ({shoppingList.filter(item => item.needed).length} item)
-                  </h4>
-                  <ul className="space-y-1">
-                    {shoppingList.filter(item => item.needed).map(item => (
-                      <li key={item.id} className="text-sm text-gray-700 flex justify-between">
-                        <span className="font-medium">{item.name}</span>
-                        <span className="text-gray-500">
-                          {Math.ceil(item.quantity * 10) / 10} {unitTranslations[item.unit] || item.unit}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  {shoppingList.filter(item => item.needed).length === 0 && (
-                    <p className="text-sm text-gray-500 italic">Semua bahan sudah tersedia!</p>
-                  )}
-                </div>
-                
-                <div>
-                  <h4 className="font-medium text-blue-800 mb-2 flex items-center gap-2">
-                    <CheckCircle className="text-blue-600" size={16} />
-                    Sudah Ada ({shoppingList.filter(item => !item.needed).length} item)
-                  </h4>
-                  <ul className="space-y-1">
-                    {shoppingList.filter(item => !item.needed).map(item => (
-                      <li key={item.id} className="text-sm text-gray-500 flex justify-between">
-                        <span>{item.name}</span>
-                        <span>✓</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-800 mb-2">Ringkasan Optimasi</h4>
-                  <div className="text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span>Total item:</span>
-                      <span className="font-medium">{shoppingList.length}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Perlu beli:</span>
-                      <span className="font-medium text-green-600">
-                        {shoppingList.filter(item => item.needed).length}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Sudah ada:</span>
-                      <span className="font-medium text-blue-600">
-                        {shoppingList.filter(item => !item.needed).length}
-                      </span>
-                    </div>
-                    <div className="flex justify-between pt-2 border-t">
-                      <span>Efisiensi:</span>
-                      <span className="font-medium text-purple-600">
-                        {Math.round((shoppingList.filter(item => !item.needed).length / Math.max(shoppingList.length, 1)) * 100)}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -887,15 +811,6 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
             <p className="text-gray-400 text-sm">
               Sistem akan mengoptimalkan penggunaan bahan yang ada, lalu melengkapi dengan resep dataset dan saran AI
             </p>
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
-              <h4 className="font-medium text-blue-900 mb-2">Strategi Optimasi:</h4>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>1. Prioritas resep tersimpan dengan bahan yang ada</li>
-                <li>2. Tambahkan resep dataset populer</li>
-                <li>3. AI mengisi slot kosong dengan variasi</li>
-                <li>4. Optimasi daftar belanja</li>
-              </ul>
-            </div>
           </div>
         </div>
       )}
