@@ -122,21 +122,6 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     dinner: 'Makan Malam',
   };
 
-  // Helper function to calculate ingredient match score for a recipe
-  const calculateIngredientMatch = (recipe: Recipe, availableIngredients: string[]): number => {
-    if (!recipe.recipe_ingredients || recipe.recipe_ingredients.length === 0) return 0;
-    
-    const recipeIngredients = recipe.recipe_ingredients.map(ing => ing.name.toLowerCase());
-    const matches = recipeIngredients.filter(recipeIng => 
-      availableIngredients.some(available => 
-        available.includes(recipeIng) || recipeIng.includes(available) ||
-        this.isSimilarIngredient(available, recipeIng)
-      )
-    );
-    
-    return matches.length / recipeIngredients.length;
-  };
-
   // Helper function to check ingredient similarity
   const isSimilarIngredient = (ingredient1: string, ingredient2: string): boolean => {
     const synonyms = {
@@ -158,6 +143,21 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     }
 
     return false;
+  };
+
+  // Helper function to calculate ingredient match score for a recipe
+  const calculateIngredientMatch = (recipe: Recipe, availableIngredients: string[]): number => {
+    if (!recipe.recipe_ingredients || recipe.recipe_ingredients.length === 0) return 0;
+    
+    const recipeIngredients = recipe.recipe_ingredients.map(ing => ing.name.toLowerCase());
+    const matches = recipeIngredients.filter(recipeIng => 
+      availableIngredients.some(available => 
+        available.includes(recipeIng) || recipeIng.includes(available) ||
+        isSimilarIngredient(available, recipeIng)
+      )
+    );
+    
+    return matches.length / recipeIngredients.length;
   };
 
   // Helper function to create AI recipes for empty slots
