@@ -21,6 +21,11 @@ interface PeopleCountModalProps {
   onConfirm: (count: number) => void;
 }
 
+interface DailyRecipes {
+  date: string;
+  recipes: (Recipe | null)[];
+}
+
 const PeopleCountModal: React.FC<PeopleCountModalProps> = ({ isOpen, onClose, onConfirm }) => {
   const [peopleCount, setPeopleCount] = useState(4);
 
@@ -113,7 +118,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     getCurrentWeekPlan 
   } = useWeeklyPlans(user?.id);
   
-  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan | null>(null);
+  const [weeklyPlan, setWeeklyPlan] = useState<{ id: string; week_start: string; user_id: string; daily_recipes: DailyRecipes[] } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
@@ -126,21 +131,46 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
   const [planSaved, setPlanSaved] = useState(false);
 
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-  const meals = ['breakfast', 'lunch', 'dinner'];
-  const mealLabels = {
-    breakfast: 'Sarapan',
-    lunch: 'Makan Siang',
-    dinner: 'Makan Malam',
-  };
 
   // Load current week plan on component mount
   useEffect(() => {
     if (!plansLoading && weeklyPlans.length > 0) {
       const currentPlan = getCurrentWeekPlan();
       if (currentPlan) {
-        setWeeklyPlan(currentPlan);
+        // Convert old format to new format
+        const dailyRecipes: DailyRecipes[] = [];
+        for (let i = 0; i < 7; i++) {
+          const date = new Date();
+          date.setDate(date.getDate() + i);
+          
+          const dayMeal = currentPlan.daily_meals?.find(meal => meal.date === date.toISOString().slice(0, 10));
+          const recipes: (Recipe | null)[] = [];
+          
+          if (dayMeal) {
+            if (dayMeal.breakfast) recipes.push(dayMeal.breakfast);
+            if (dayMeal.lunch) recipes.push(dayMeal.lunch);
+            if (dayMeal.dinner) recipes.push(dayMeal.dinner);
+          }
+          
+          // Ensure we have exactly 3 slots (fill with null if needed)
+          while (recipes.length < 3) {
+            recipes.push(null);
+          }
+          
+          dailyRecipes.push({
+            date: date.toISOString().slice(0, 10),
+            recipes: recipes.slice(0, 3) // Ensure max 3
+          });
+        }
+        
+        setWeeklyPlan({
+          id: currentPlan.id,
+          week_start: currentPlan.week_start,
+          user_id: currentPlan.user_id,
+          daily_recipes: dailyRecipes
+        });
         setPlanSaved(true);
-        generateShoppingList(currentPlan, peopleCount);
+        generateShoppingList({ daily_recipes: dailyRecipes }, peopleCount);
       }
     }
   }, [plansLoading, weeklyPlans]);
@@ -185,15 +215,13 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
 
   // Helper function to create AI recipes for empty slots
   const generateAIRecipesForEmptySlots = async (
-    emptySlots: Array<{day: number, meal: string}>,
+    emptySlots: Array<{day: number, slot: number}>,
     geminiService: GeminiService,
     usedIngredients: Set<string>
   ): Promise<Recipe[]> => {
     if (emptySlots.length === 0) return [];
 
     try {
-      // Create a prompt that considers used ingredients and meal types
-      const mealTypes = emptySlots.map(slot => `${slot.meal} untuk hari ke-${slot.day + 1}`);
       const availableIngredientNames = ingredients
         .filter(ing => !usedIngredients.has(ing.name.toLowerCase()))
         .map(ing => `${ing.name} (${ing.quantity} ${ing.unit})`);
@@ -201,14 +229,14 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
       const prompt = `
 Saya memiliki bahan-bahan berikut: ${availableIngredientNames.join(', ')}
 
-Tolong buatkan ${emptySlots.length} resep masakan Indonesia yang berbeda untuk:
-${mealTypes.join(', ')}
+Tolong buatkan ${emptySlots.length} resep masakan Indonesia yang berbeda dan bervariasi.
 
 Pastikan setiap resep:
 1. Menggunakan bahan yang tersedia
-2. Sesuai dengan waktu makan (sarapan lebih ringan, makan siang/malam lebih lengkap)
-3. Mudah dibuat dan praktis
-4. Bervariasi (tidak ada yang sama)
+2. Mudah dibuat dan praktis
+3. Bervariasi (tidak ada yang sama)
+4. Cocok untuk keluarga Indonesia
+5. TIDAK ada resep sederhana atau fallback
 
 Berikan respon dalam format JSON yang valid dengan struktur berikut:
 
@@ -282,11 +310,11 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
     setIsGenerating(true);
     setPeopleCount(targetPeopleCount);
     setGenerationProgress('Memulai perencanaan menu...');
-    setPlanSaved(false); // Reset saved status when generating new plan
+    setPlanSaved(false);
     
     try {
       const currentWeek = new Date().toISOString().slice(0, 10);
-      const dailyMeals: DailyMeals[] = [];
+      const dailyRecipes: DailyRecipes[] = [];
       
       // Initialize services
       const datasetService = new SupabaseDatasetService();
@@ -311,7 +339,6 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
           matchScore: calculateIngredientMatch(recipe, availableIngredientNames)
         }))
         .sort((a, b) => {
-          // First sort by match score, then by creation date (newer first)
           if (Math.abs(a.matchScore - b.matchScore) > 0.1) {
             return b.matchScore - a.matchScore;
           }
@@ -334,31 +361,32 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
 
       setGenerationProgress('Menyusun menu untuk 7 hari...');
 
-      // Initialize daily meals structure
+      // Initialize daily recipes structure (3 recipes per day)
       for (let i = 0; i < 7; i++) {
         const date = new Date();
         date.setDate(date.getDate() + i);
         
-        dailyMeals.push({
+        dailyRecipes.push({
           date: date.toISOString().slice(0, 10),
+          recipes: [null, null, null] // 3 slots per day
         });
       }
 
       // Phase 1: PRIORITIZE SAVED RECIPES - Fill as many slots as possible with saved recipes
       let recipeIndex = 0;
-      let totalSlots = 21; // 7 days × 3 meals
+      let totalSlots = 21; // 7 days × 3 recipes
       let slotsFilledWithSaved = 0;
 
       // First pass: Fill with saved recipes that have good ingredient matches
       for (let dayIndex = 0; dayIndex < 7 && recipeIndex < availableRecipes.length; dayIndex++) {
-        for (const mealType of meals) {
+        for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
           if (recipeIndex >= availableRecipes.length) break;
           
           const recipe = availableRecipes[recipeIndex];
           
           // Only use saved recipes with decent ingredient match (>= 0.2) or if we have many saved recipes
           if (recipe.matchScore >= 0.2 || availableRecipes.length >= 10) {
-            dailyMeals[dayIndex][mealType as keyof DailyMeals] = recipe;
+            dailyRecipes[dayIndex].recipes[slotIndex] = recipe;
             
             // Track used ingredients
             if (recipe.recipe_ingredients) {
@@ -368,7 +396,7 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
             }
             
             slotsFilledWithSaved++;
-            console.log(`Filled ${mealType} on day ${dayIndex + 1} with saved recipe: ${recipe.name} (score: ${recipe.matchScore})`);
+            console.log(`Filled day ${dayIndex + 1} slot ${slotIndex + 1} with saved recipe: ${recipe.name} (score: ${recipe.matchScore})`);
           }
           
           recipeIndex++;
@@ -384,10 +412,10 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
         let slotsFilledWithDataset = 0;
         
         for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-          for (const mealType of meals) {
-            if (!dailyMeals[dayIndex][mealType as keyof DailyMeals] && datasetIndex < datasetRecipes.length) {
+          for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
+            if (!dailyRecipes[dayIndex].recipes[slotIndex] && datasetIndex < datasetRecipes.length) {
               const recipe = datasetRecipes[datasetIndex];
-              dailyMeals[dayIndex][mealType as keyof DailyMeals] = recipe;
+              dailyRecipes[dayIndex].recipes[slotIndex] = recipe;
               
               // Track used ingredients
               if (recipe.recipe_ingredients) {
@@ -397,7 +425,7 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
               }
               
               slotsFilledWithDataset++;
-              console.log(`Filled ${mealType} on day ${dayIndex + 1} with dataset recipe: ${recipe.name}`);
+              console.log(`Filled day ${dayIndex + 1} slot ${slotIndex + 1} with dataset recipe: ${recipe.name}`);
               datasetIndex++;
             }
           }
@@ -411,11 +439,11 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
         setGenerationProgress('Mengisi slot kosong dengan saran AI...');
         
         // Find empty slots
-        const emptySlots: Array<{day: number, meal: string}> = [];
+        const emptySlots: Array<{day: number, slot: number}> = [];
         for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-          for (const mealType of meals) {
-            if (!dailyMeals[dayIndex][mealType as keyof DailyMeals]) {
-              emptySlots.push({ day: dayIndex, meal: mealType });
+          for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
+            if (!dailyRecipes[dayIndex].recipes[slotIndex]) {
+              emptySlots.push({ day: dayIndex, slot: slotIndex });
             }
           }
         }
@@ -430,8 +458,8 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
             let aiIndex = 0;
             for (const slot of emptySlots) {
               if (aiIndex < aiRecipes.length) {
-                dailyMeals[slot.day][slot.meal as keyof DailyMeals] = aiRecipes[aiIndex];
-                console.log(`Filled ${slot.meal} on day ${slot.day + 1} with AI recipe: ${aiRecipes[aiIndex].name}`);
+                dailyRecipes[slot.day].recipes[slot.slot] = aiRecipes[aiIndex];
+                console.log(`Filled day ${slot.day + 1} slot ${slot.slot + 1} with AI recipe: ${aiRecipes[aiIndex].name}`);
                 aiIndex++;
               }
             }
@@ -441,66 +469,13 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
         }
       }
 
-      // Phase 4: Final fallback - create simple placeholder recipes for any remaining empty slots
       setGenerationProgress('Menyelesaikan rencana menu...');
       
-      const fallbackRecipes = [
-        { name: 'Nasi Putih + Telur Dadar', meal: 'breakfast' },
-        { name: 'Mie Instan + Telur', meal: 'breakfast' },
-        { name: 'Roti Bakar + Selai', meal: 'breakfast' },
-        { name: 'Nasi + Ayam Goreng', meal: 'lunch' },
-        { name: 'Nasi + Ikan Bakar', meal: 'lunch' },
-        { name: 'Nasi + Sayur Sop', meal: 'lunch' },
-        { name: 'Nasi + Rendang', meal: 'dinner' },
-        { name: 'Nasi + Gudeg', meal: 'dinner' },
-        { name: 'Nasi + Soto Ayam', meal: 'dinner' },
-      ];
-
-      let fallbackIndex = 0;
-      let slotsFilledWithFallback = 0;
-      
-      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-        for (const mealType of meals) {
-          if (!dailyMeals[dayIndex][mealType as keyof DailyMeals]) {
-            const fallback = fallbackRecipes[fallbackIndex % fallbackRecipes.length];
-            
-            dailyMeals[dayIndex][mealType as keyof DailyMeals] = {
-              id: `fallback-${dayIndex}-${mealType}`,
-              name: fallback.name,
-              description: 'Resep sederhana untuk melengkapi rencana menu',
-              prep_time: 10,
-              cook_time: 15,
-              servings: targetPeopleCount,
-              difficulty: 'easy' as const,
-              instructions: ['Siapkan bahan-bahan', 'Masak sesuai cara biasa', 'Sajikan hangat'],
-              tags: ['sederhana', 'cepat'],
-              user_id: 'fallback',
-              recipe_ingredients: [
-                {
-                  id: `fallback-${dayIndex}-${mealType}-ing-1`,
-                  recipe_id: `fallback-${dayIndex}-${mealType}`,
-                  name: 'Bahan utama',
-                  quantity: 1,
-                  unit: 'porsi',
-                }
-              ],
-            };
-            
-            slotsFilledWithFallback++;
-            console.log(`Filled ${mealType} on day ${dayIndex + 1} with fallback recipe: ${fallback.name}`);
-            fallbackIndex++;
-          }
-        }
-      }
-
-      console.log(`Phase 4 complete: ${slotsFilledWithFallback} slots filled with fallback recipes`);
-      console.log(`Final summary: ${slotsFilledWithSaved} saved + ${datasetRecipes.length > 0 ? 'dataset' : '0'} + AI + ${slotsFilledWithFallback} fallback = ${totalSlots} total slots`);
-      
-      const newPlan: WeeklyPlan = {
+      const newPlan = {
         id: 'plan-' + Date.now(),
         week_start: currentWeek,
         user_id: user?.id || 'current-user',
-        daily_meals: dailyMeals,
+        daily_recipes: dailyRecipes,
       };
       
       setWeeklyPlan(newPlan);
@@ -522,10 +497,21 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
     try {
       const today = new Date();
       const monday = new Date(today);
-      monday.setDate(today.getDate() - today.getDay() + 1); // Get Monday of current week
+      monday.setDate(today.getDate() - today.getDay() + 1);
       const weekStart = monday.toISOString().slice(0, 10);
 
-      await saveWeeklyPlan(weekStart, weeklyPlan.daily_meals || [], peopleCount);
+      // Convert new format back to old format for saving
+      const dailyMeals: DailyMeals[] = weeklyPlan.daily_recipes.map(day => {
+        const meal: DailyMeals = { date: day.date };
+        
+        if (day.recipes[0]) meal.breakfast = day.recipes[0];
+        if (day.recipes[1]) meal.lunch = day.recipes[1];
+        if (day.recipes[2]) meal.dinner = day.recipes[2];
+        
+        return meal;
+      });
+
+      await saveWeeklyPlan(weekStart, dailyMeals, peopleCount);
       setPlanSaved(true);
       console.log('Weekly plan saved successfully!');
     } catch (error) {
@@ -535,16 +521,15 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
     }
   };
 
-  const generateShoppingList = (plan: WeeklyPlan, targetPeopleCount: number) => {
+  const generateShoppingList = (plan: { daily_recipes: DailyRecipes[] }, targetPeopleCount: number) => {
     const neededIngredients: Record<string, ShoppingItem> = {};
     
     // Collect all ingredients needed for the week
-    (plan.daily_meals || []).forEach(day => {
-      [day.breakfast, day.lunch, day.dinner].forEach(recipe => {
+    plan.daily_recipes.forEach(day => {
+      day.recipes.forEach(recipe => {
         if (recipe && recipe.recipe_ingredients) {
           recipe.recipe_ingredients.forEach(ingredient => {
             const key = ingredient.name.toLowerCase();
-            // Adjust quantity based on people count vs recipe servings
             const adjustedQuantity = (ingredient.quantity * targetPeopleCount) / (recipe.servings || 4);
             
             if (neededIngredients[key]) {
@@ -575,14 +560,13 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
       const available = availableIngredients[item.name.toLowerCase()] || 0;
       if (available >= item.quantity) {
         item.needed = false;
-        item.quantity = 0; // We have enough
+        item.quantity = 0;
       } else {
         item.quantity = Math.max(0, item.quantity - available);
         item.needed = item.quantity > 0;
       }
     });
 
-    // Filter out items with 0 quantity
     const filteredList = Object.values(neededIngredients).filter(item => 
       item.needed || item.quantity > 0
     );
@@ -590,23 +574,44 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
     setShoppingList(filteredList);
   };
 
-  const assignMealToDay = (dayIndex: number, mealType: keyof DailyMeals, recipe: Recipe | null) => {
-    if (!weeklyPlan || !weeklyPlan.daily_meals) return;
+  const addRecipeToDay = (dayIndex: number) => {
+    if (!weeklyPlan) return;
     
-    const updatedMeals = [...weeklyPlan.daily_meals];
-    updatedMeals[dayIndex] = {
-      ...updatedMeals[dayIndex],
-      [mealType]: recipe,
-    };
+    const updatedPlan = { ...weeklyPlan };
+    const currentRecipes = updatedPlan.daily_recipes[dayIndex].recipes;
     
-    const updatedPlan = {
-      ...weeklyPlan,
-      daily_meals: updatedMeals,
-    };
+    // Find first empty slot or add if less than 3
+    const emptySlotIndex = currentRecipes.findIndex(recipe => recipe === null);
+    if (emptySlotIndex !== -1) {
+      // There's an empty slot, but we don't add anything here - user will select from dropdown
+      return;
+    } else if (currentRecipes.length < 3) {
+      updatedPlan.daily_recipes[dayIndex].recipes.push(null);
+      setWeeklyPlan(updatedPlan);
+      setPlanSaved(false);
+    }
+  };
+
+  const assignRecipeToSlot = (dayIndex: number, slotIndex: number, recipe: Recipe | null) => {
+    if (!weeklyPlan) return;
+    
+    const updatedPlan = { ...weeklyPlan };
+    updatedPlan.daily_recipes[dayIndex].recipes[slotIndex] = recipe;
     
     setWeeklyPlan(updatedPlan);
     generateShoppingList(updatedPlan, peopleCount);
-    setPlanSaved(false); // Mark as unsaved when modified
+    setPlanSaved(false);
+  };
+
+  const removeRecipeFromSlot = (dayIndex: number, slotIndex: number) => {
+    if (!weeklyPlan) return;
+    
+    const updatedPlan = { ...weeklyPlan };
+    updatedPlan.daily_recipes[dayIndex].recipes.splice(slotIndex, 1);
+    
+    setWeeklyPlan(updatedPlan);
+    generateShoppingList(updatedPlan, peopleCount);
+    setPlanSaved(false);
   };
 
   const handleRecipeClick = (recipe: Recipe) => {
@@ -638,8 +643,6 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
       })) || [];
 
       await addRecipe(recipeData, ingredients);
-      
-      // Show success message (you might want to add a toast system)
       console.log('Recipe saved successfully!');
     } catch (err) {
       console.error('Error saving recipe:', err);
@@ -653,8 +656,6 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
       return { type: 'ai', icon: Sparkles, color: 'text-purple-500', label: 'AI' };
     } else if (recipe.user_id === 'dataset') {
       return { type: 'dataset', icon: Database, color: 'text-blue-500', label: 'Dataset' };
-    } else if (recipe.user_id === 'fallback') {
-      return { type: 'fallback', icon: ChefHat, color: 'text-gray-500', label: 'Sederhana' };
     } else {
       return { type: 'saved', icon: ChefHat, color: 'text-green-500', label: 'Tersimpan' };
     }
@@ -685,7 +686,7 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Rencana Menu Mingguan</h2>
-          <p className="text-gray-600 mt-1">Rencanakan menu makan untuk seminggu dengan optimasi bahan</p>
+          <p className="text-gray-600 mt-1">Rencanakan 3 resep per hari dengan optimasi bahan</p>
         </div>
         <div className="flex items-center gap-3">
           {weeklyPlan && (
@@ -768,7 +769,7 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
         </div>
       )}
 
-      {weeklyPlan && weeklyPlan.daily_meals && !isGenerating && (
+      {weeklyPlan && weeklyPlan.daily_recipes && !isGenerating && (
         <div className="space-y-6">
           {/* Recipe Source Legend */}
           <div className="bg-gray-50 rounded-lg p-4">
@@ -786,75 +787,68 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
                 <Sparkles className="text-purple-500" size={16} />
                 <span>Saran AI</span>
               </div>
-              <div className="flex items-center gap-2">
-                <ChefHat className="text-gray-500" size={16} />
-                <span>Resep Sederhana</span>
-              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
-            {weeklyPlan.daily_meals.map((day, dayIndex) => (
+            {weeklyPlan.daily_recipes.map((day, dayIndex) => (
               <div key={dayIndex} className="bg-white rounded-lg shadow-md border border-blue-100 p-4">
                 <h3 className="font-semibold text-gray-900 mb-3 text-center">
                   {days[dayIndex]}
                 </h3>
                 <div className="space-y-3">
-                  {meals.map((mealType) => (
-                    <div key={mealType} className="border border-gray-200 rounded-lg p-2">
+                  {day.recipes.map((recipe, slotIndex) => (
+                    <div key={slotIndex} className="border border-gray-200 rounded-lg p-2">
                       <div className="text-xs font-medium text-gray-600 mb-1">
-                        {mealLabels[mealType as keyof typeof mealLabels]}
+                        Resep {slotIndex + 1}
                       </div>
-                      {day[mealType as keyof DailyMeals] ? (
+                      {recipe ? (
                         <div className="text-sm">
                           <div className="flex items-start justify-between mb-1">
                             <div 
                               className="font-medium text-gray-900 line-clamp-2 flex-1 cursor-pointer hover:text-blue-600 transition-colors"
-                              onClick={() => handleRecipeClick(day[mealType as keyof DailyMeals] as Recipe)}
+                              onClick={() => handleRecipeClick(recipe)}
                             >
-                              {(day[mealType as keyof DailyMeals] as Recipe)?.name}
+                              {recipe.name}
                             </div>
                             <div className="ml-1 flex-shrink-0 flex items-center gap-1">
                               {(() => {
-                                const source = getRecipeSource(day[mealType as keyof DailyMeals] as Recipe);
+                                const source = getRecipeSource(recipe);
                                 const SourceIcon = source.icon;
                                 return <SourceIcon className={source.color} size={14} title={source.label} />;
                               })()}
                               <Eye 
                                 className="text-gray-400 hover:text-blue-500 cursor-pointer" 
                                 size={12}
-                                onClick={() => handleRecipeClick(day[mealType as keyof DailyMeals] as Recipe)}
+                                onClick={() => handleRecipeClick(recipe)}
                                 title="Lihat detail"
                               />
                             </div>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                             <Clock size={10} />
-                            <span>
-                              {((day[mealType as keyof DailyMeals] as Recipe)?.prep_time || 0) + 
-                               ((day[mealType as keyof DailyMeals] as Recipe)?.cook_time || 0)} menit
-                            </span>
+                            <span>{recipe.prep_time + recipe.cook_time} menit</span>
                             <Users size={10} />
                             <span>{peopleCount} porsi</span>
                           </div>
                           
                           {/* Save button for external recipes */}
-                          {isRecipeFromExternalSource(day[mealType as keyof DailyMeals] as Recipe) && (
+                          {isRecipeFromExternalSource(recipe) && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                saveRecipeToCollection(day[mealType as keyof DailyMeals] as Recipe);
+                                saveRecipeToCollection(recipe);
                               }}
-                              disabled={savingRecipeId === (day[mealType as keyof DailyMeals] as Recipe).id}
+                              disabled={savingRecipeId === recipe.id}
                               className="text-xs text-green-600 hover:text-green-800 mb-1 flex items-center gap-1 disabled:text-gray-400"
                             >
                               <Save size={10} />
-                              {savingRecipeId === (day[mealType as keyof DailyMeals] as Recipe).id ? 'Menyimpan...' : 'Simpan'}
+                              {savingRecipeId === recipe.id ? 'Menyimpan...' : 'Simpan'}
                             </button>
                           )}
                           
                           <button
-                            onClick={() => assignMealToDay(dayIndex, mealType as keyof DailyMeals, null)}
+                            onClick={() => removeRecipeFromSlot(dayIndex, slotIndex)}
                             className="text-xs text-red-600 hover:text-red-800"
                           >
                             Hapus
@@ -866,7 +860,7 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
                             onChange={(e) => {
                               const recipe = recipes.find(r => r.id === e.target.value);
                               if (recipe) {
-                                assignMealToDay(dayIndex, mealType as keyof DailyMeals, recipe);
+                                assignRecipeToSlot(dayIndex, slotIndex, recipe);
                               }
                             }}
                             className="w-full text-xs border border-gray-300 rounded px-1 py-1"
@@ -882,6 +876,17 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
                       )}
                     </div>
                   ))}
+                  
+                  {/* Add recipe button (max 3) */}
+                  {day.recipes.length < 3 && (
+                    <button
+                      onClick={() => addRecipeToDay(dayIndex)}
+                      className="w-full text-xs text-blue-600 hover:text-blue-800 border border-dashed border-blue-300 rounded-lg py-2 flex items-center justify-center gap-1"
+                    >
+                      <Plus size={12} />
+                      Tambah Resep
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -939,6 +944,9 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
             <p className="text-gray-500 font-medium">Buat rencana menu mingguan yang optimal!</p>
             <p className="text-gray-400 text-sm">
               Sistem akan mengoptimalkan penggunaan bahan yang ada, lalu melengkapi dengan resep dataset dan saran AI
+            </p>
+            <p className="text-gray-400 text-sm">
+              Setiap hari akan memiliki 3 resep yang bisa disesuaikan (minimum 0, maksimum 3)
             </p>
             {getCurrentWeekPlan() && (
               <p className="text-blue-600 text-sm font-medium">
