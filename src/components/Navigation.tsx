@@ -26,7 +26,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
     { id: 'recipes', label: 'Resep', icon: BookOpen, feature: null },
     { id: 'suggestions', label: 'Inspirasi AI', icon: Lightbulb, feature: 'suggestions' as const },
     { id: 'dataset', label: 'Dataset', icon: Database, feature: 'dataset' as const },
-    { id: 'rag', label: 'RAG AI', icon: Brain, feature: 'rag' as const },
+    { id: 'rag', label: 'Asisten AI', icon: Brain, feature: 'rag' as const },
     { id: 'weekly-plan', label: 'Rencana Mingguan', icon: Calendar, feature: 'weeklyPlanner' as const },
   ];
 
