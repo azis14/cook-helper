@@ -211,7 +211,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
         <div>
           <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Brain className="text-purple-600" size={28} />
-            RAG Recipe Intelligence
+            Asisten AI
           </h2>
           <p className="text-gray-600 mt-1">
             Rekomendasi resep menggunakan AI semantik dan embedding dengan pemrosesan AI
