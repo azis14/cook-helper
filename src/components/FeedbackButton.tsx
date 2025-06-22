@@ -28,8 +28,8 @@ export const FeedbackButton: React.FC = () => {
         user_id: user?.id || null,
         feedback_text: feedback.trim(),
         user_email: email.trim() || user?.email || null,
-        page_url: window.location.href,
-        user_agent: navigator.userAgent,
+        page_url: null, // Simplified - no longer collecting page URL
+        user_agent: null, // Simplified - no longer collecting user agent
       };
 
       const { error: submitError } = await supabase
@@ -186,7 +186,6 @@ export const FeedbackButton: React.FC = () => {
                       <p className="text-xs text-gray-600">
                         <strong>Yang akan kami kumpulkan:</strong><br />
                         • Feedback Anda<br />
-                        • Halaman saat ini: {window.location.pathname}<br />
                         • Email: {user?.email || email || 'Tidak ada'}<br />
                         • Waktu: {new Date().toLocaleString('id-ID')}
                       </p>
