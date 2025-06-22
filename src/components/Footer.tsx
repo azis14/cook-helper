@@ -9,7 +9,7 @@ export const Footer: React.FC = () => {
           {/* Copyright Section */}
           <div className="flex items-center gap-2 text-gray-700">
             <span className="text-sm">
-              © 2025 Made with
+              © 2025 Cooked with
             </span>
             <Heart className="text-red-500" size={16} />
             <span className="text-sm">
