@@ -29,7 +29,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
   const [savedRecipeIds, setSavedRecipeIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState({
     minSimilarity: 0.3,
-    maxResults: 20,
+    maxResults: 10, // Reduced from 20 to 10 for better performance
     minLoves: 10,
   });
 
@@ -62,6 +62,12 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
   useEffect(() => {
     localStorage.setItem('saved-rag-recipe-ids', JSON.stringify(Array.from(savedRecipeIds)));
   }, [savedRecipeIds]);
+
+  // Clear recommendations when component mounts or when switching to this tab
+  useEffect(() => {
+    setRecommendations([]);
+    setSearchQuery('');
+  }, []); // Only run on mount
 
   // Initialize service silently in the background
   useEffect(() => {
@@ -289,6 +295,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
           <p className="text-gray-600">AI sedang menganalisis dan memproses resep yang paling relevan...</p>
+          <p className="text-sm text-gray-500 mt-2">Mencari hingga {filters.maxResults} resep terbaik...</p>
         </div>
       )}
 
@@ -321,7 +328,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
               Ditemukan {recommendations.length} resep yang relevan
             </h3>
             <div className="text-sm text-gray-500">
-              Menampilkan hingga 20 resep terbaik
+              Menampilkan hingga {filters.maxResults} resep terbaik
             </div>
           </div>
           
