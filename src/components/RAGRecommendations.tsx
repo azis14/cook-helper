@@ -20,11 +20,29 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
   const { user } = useAuth();
   const { addRecipe } = useRecipes(user?.id);
   const [ragService] = useState(() => new RAGRecipeService());
-  const [recommendations, setRecommendations] = useState<RAGRecipeRecommendation[]>([]);
+  
+  // Initialize state from localStorage to persist across tab switches
+  const [recommendations, setRecommendations] = useState<RAGRecipeRecommendation[]>(() => {
+    try {
+      const saved = localStorage.getItem('rag-recommendations');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<RAGRecipeRecommendation | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  
+  const [searchQuery, setSearchQuery] = useState(() => {
+    try {
+      return localStorage.getItem('rag-search-query') || '';
+    } catch {
+      return '';
+    }
+  });
+  
   const [savingRecipeId, setSavingRecipeId] = useState<string | null>(null);
   const [savedRecipeIds, setSavedRecipeIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState({
@@ -44,6 +62,15 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
     medium: 'bg-yellow-100 text-yellow-800',
     hard: 'bg-red-100 text-red-800',
   };
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('rag-recommendations', JSON.stringify(recommendations));
+  }, [recommendations]);
+
+  useEffect(() => {
+    localStorage.setItem('rag-search-query', searchQuery);
+  }, [searchQuery]);
 
   // Load saved recipe IDs from localStorage on component mount
   useEffect(() => {
