@@ -33,12 +33,10 @@ export const IngredientManager: React.FC = () => {
 
   const categoryTranslations: Record<string, string> = {
     vegetables: 'Sayuran',
-    meat: 'Daging',
-    dairy: 'Susu & Olahan',
-    grains: 'Biji-bijian',
-    spices: 'Rempah-rempah',
-    fruits: 'Buah-buahan',
+    meat: 'Daging & Unggas',
     seafood: 'Makanan Laut',
+    dairy: 'Susu & Olahan',
+    fruits: 'Buah-buahan',
   };
 
   const unitTranslations: Record<string, string> = {
