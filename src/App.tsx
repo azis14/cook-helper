@@ -9,6 +9,7 @@ import { DatasetRecommendations } from './components/DatasetRecommendations';
 import { RAGRecommendations } from './components/RAGRecommendations';
 import { WeeklyPlanner } from './components/WeeklyPlanner';
 import { AuthForm } from './components/AuthForm';
+import { ResetPasswordForm } from './components/ResetPasswordForm';
 import { Toast } from './components/Toast';
 import { UserProfileModal } from './components/UserProfileModal';
 import { useAuth } from './hooks/useAuth';
@@ -29,6 +30,14 @@ function App() {
   const [activeTab, setActiveTab] = useState('ingredients');
   const [featuresLoaded, setFeaturesLoaded] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [isResetPassword, setIsResetPassword] = useState(false);
+
+  // Check if this is a password reset flow
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isReset = window.location.pathname === '/reset-password' || urlParams.has('type') && urlParams.get('type') === 'recovery';
+    setIsResetPassword(isReset);
+  }, []);
 
   // Preload feature flags on app start
   useEffect(() => {
@@ -42,6 +51,13 @@ function App() {
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const handleResetPasswordSuccess = () => {
+    setIsResetPassword(false);
+    // Clear URL parameters
+    window.history.replaceState({}, document.title, window.location.pathname);
+    showSuccess('Password berhasil diperbarui! Selamat datang kembali.');
   };
 
   const getDisplayName = () => {
@@ -122,6 +138,11 @@ function App() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
       </div>
     );
+  }
+
+  // Show reset password form if user is authenticated and in reset flow
+  if (user && isResetPassword) {
+    return <ResetPasswordForm onSuccess={handleResetPasswordSuccess} />;
   }
 
   if (!user) {

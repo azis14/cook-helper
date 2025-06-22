@@ -3,6 +3,7 @@ import { ChefHat, Mail, Lock, User } from 'lucide-react';
 import { signIn, signUp, signInWithGoogle } from '../lib/supabase';
 import { Header } from './Header';
 import { Footer } from './Footer';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
 
 interface AuthFormProps {
   onSuccess: () => void;
@@ -15,6 +16,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +150,19 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
               </div>
             </div>
 
+            {/* Forgot Password Link - only show on login */}
+            {isLogin && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-sm text-orange-600 hover:text-orange-800 transition-colors"
+                >
+                  Lupa password?
+                </button>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading || googleLoading}
@@ -169,6 +184,12 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
       </div>
 
       <Footer />
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
     </div>
   );
 };
