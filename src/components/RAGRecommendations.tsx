@@ -100,13 +100,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
 
   const handleSemanticSearch = async () => {
     if (!searchQuery.trim()) {
-      // If search query is empty, search based on ingredients
-      if (ingredients.length > 0) {
-        generateRAGRecommendations();
-      } else {
-        showError('Masukkan kata kunci pencarian atau tambahkan bahan-bahan');
-        setRecommendations([]);
-      }
+      showError('Masukkan kata kunci pencarian');
       return;
     }
 
@@ -257,7 +251,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
               />
               <button
                 onClick={handleSemanticSearch}
-                disabled={isLoading}
+                disabled={isLoading || !searchQuery.trim()}
                 className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:bg-purple-400 disabled:cursor-not-allowed"
               >
                 <Search size={18} />
