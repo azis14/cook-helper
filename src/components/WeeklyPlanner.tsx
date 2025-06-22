@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Calendar, ShoppingCart, Clock, Users, Plus, Trash2, RefreshCw, ChefHat, Sparkles, Database, CheckCircle, Eye, Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, ShoppingCart, Clock, Users, Plus, Trash2, RefreshCw, ChefHat, Sparkles, Database, CheckCircle, Eye, Save, Archive, Edit3 } from 'lucide-react';
 import { Recipe, WeeklyPlan, DailyMeals, ShoppingItem, Ingredient } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useRecipes } from '../hooks/useRecipes';
+import { useWeeklyPlans } from '../hooks/useWeeklyPlans';
 import { supabase } from '../lib/supabase';
 import GeminiService from '../services/geminiService';
 import SupabaseDatasetService from '../services/supabaseDatasetService';
@@ -104,8 +105,17 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
 }) => {
   const { user } = useAuth();
   const { addRecipe } = useRecipes(user?.id);
+  const { 
+    weeklyPlans, 
+    loading: plansLoading, 
+    saveWeeklyPlan, 
+    deleteWeeklyPlan, 
+    getCurrentWeekPlan 
+  } = useWeeklyPlans(user?.id);
+  
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
   const [showPeopleModal, setShowPeopleModal] = useState(false);
   const [peopleCount, setPeopleCount] = useState(4);
@@ -113,6 +123,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [savingRecipeId, setSavingRecipeId] = useState<string | null>(null);
+  const [planSaved, setPlanSaved] = useState(false);
 
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
   const meals = ['breakfast', 'lunch', 'dinner'];
@@ -121,6 +132,18 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     lunch: 'Makan Siang',
     dinner: 'Makan Malam',
   };
+
+  // Load current week plan on component mount
+  useEffect(() => {
+    if (!plansLoading && weeklyPlans.length > 0) {
+      const currentPlan = getCurrentWeekPlan();
+      if (currentPlan) {
+        setWeeklyPlan(currentPlan);
+        setPlanSaved(true);
+        generateShoppingList(currentPlan, peopleCount);
+      }
+    }
+  }, [plansLoading, weeklyPlans]);
 
   // Helper function to check ingredient similarity
   const isSimilarIngredient = (ingredient1: string, ingredient2: string): boolean => {
@@ -259,6 +282,7 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
     setIsGenerating(true);
     setPeopleCount(targetPeopleCount);
     setGenerationProgress('Memulai perencanaan menu...');
+    setPlanSaved(false); // Reset saved status when generating new plan
     
     try {
       const currentWeek = new Date().toISOString().slice(0, 10);
@@ -491,6 +515,26 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
     }
   };
 
+  const handleSaveWeeklyPlan = async () => {
+    if (!weeklyPlan || !user?.id) return;
+
+    setIsSaving(true);
+    try {
+      const today = new Date();
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - today.getDay() + 1); // Get Monday of current week
+      const weekStart = monday.toISOString().slice(0, 10);
+
+      await saveWeeklyPlan(weekStart, weeklyPlan.daily_meals || [], peopleCount);
+      setPlanSaved(true);
+      console.log('Weekly plan saved successfully!');
+    } catch (error) {
+      console.error('Error saving weekly plan:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const generateShoppingList = (plan: WeeklyPlan, targetPeopleCount: number) => {
     const neededIngredients: Record<string, ShoppingItem> = {};
     
@@ -562,6 +606,7 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
     
     setWeeklyPlan(updatedPlan);
     generateShoppingList(updatedPlan, peopleCount);
+    setPlanSaved(false); // Mark as unsaved when modified
   };
 
   const handleRecipeClick = (recipe: Recipe) => {
@@ -642,32 +687,73 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
           <h2 className="text-2xl font-bold text-gray-900">Rencana Menu Mingguan</h2>
           <p className="text-gray-600 mt-1">Rencanakan menu makan untuk seminggu dengan optimasi bahan</p>
         </div>
-        <button
-          onClick={() => setShowPeopleModal(true)}
-          disabled={isGenerating}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
-          <Calendar size={18} />
-          {isGenerating ? 'Sedang membuat...' : 'Buat Rencana Menu'}
-        </button>
+        <div className="flex items-center gap-3">
+          {weeklyPlan && (
+            <button
+              onClick={handleSaveWeeklyPlan}
+              disabled={isSaving || planSaved}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                planSaved 
+                  ? 'bg-green-100 text-green-700 cursor-default'
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              } ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {planSaved ? (
+                <>
+                  <CheckCircle size={18} />
+                  Tersimpan
+                </>
+              ) : (
+                <>
+                  <Save size={18} />
+                  {isSaving ? 'Menyimpan...' : 'Simpan Rencana'}
+                </>
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => setShowPeopleModal(true)}
+            disabled={isGenerating}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={18} />
+            {isGenerating ? 'Sedang membuat...' : (weeklyPlan ? 'Buat Ulang' : 'Buat Rencana Menu')}
+          </button>
+        </div>
       </div>
 
-      {/* People Count Display */}
+      {/* Plan Status */}
       {weeklyPlan && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className={`border rounded-lg p-4 ${planSaved ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Users className="text-blue-600" size={20} />
-              <span className="font-medium text-blue-900">
+              <Users className={planSaved ? 'text-green-600' : 'text-yellow-600'} size={20} />
+              <span className={`font-medium ${planSaved ? 'text-green-900' : 'text-yellow-900'}`}>
                 Rencana untuk {peopleCount} orang
               </span>
+              {planSaved ? (
+                <span className="text-green-700 text-sm">(Tersimpan)</span>
+              ) : (
+                <span className="text-yellow-700 text-sm">(Belum disimpan)</span>
+              )}
             </div>
-            <button
-              onClick={() => setShowPeopleModal(true)}
-              className="text-blue-600 hover:text-blue-800 text-sm"
-            >
-              Ubah jumlah
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPeopleModal(true)}
+                className="text-blue-600 hover:text-blue-800 text-sm"
+              >
+                Ubah jumlah
+              </button>
+              {!planSaved && (
+                <button
+                  onClick={handleSaveWeeklyPlan}
+                  disabled={isSaving}
+                  className="text-green-600 hover:text-green-800 text-sm font-medium"
+                >
+                  {isSaving ? 'Menyimpan...' : 'Simpan Sekarang'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -800,6 +886,49 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
               </div>
             ))}
           </div>
+
+          {/* Shopping List */}
+          {shoppingList.length > 0 && (
+            <div className="bg-white rounded-lg shadow-md border border-green-100 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <ShoppingCart className="text-green-600" size={24} />
+                <h3 className="text-lg font-semibold text-gray-900">Daftar Belanja</h3>
+                <span className="text-sm text-gray-500">untuk {peopleCount} orang</span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <h4 className="font-medium text-green-800 mb-2">Perlu Dibeli</h4>
+                  <ul className="space-y-1">
+                    {shoppingList.filter(item => item.needed).map(item => (
+                      <li key={item.id} className="text-sm text-gray-700">
+                        <span className="font-medium">
+                          {item.name}
+                        </span>
+                        <span className="text-gray-500 ml-2">
+                          {item.quantity.toFixed(1)} {unitTranslations[item.unit] || item.unit}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-blue-800 mb-2">Sudah Ada</h4>
+                  <ul className="space-y-1">
+                    {shoppingList.filter(item => !item.needed).map(item => (
+                      <li key={item.id} className="text-sm text-gray-500">
+                        <span>
+                          {item.name}
+                        </span>
+                        <span className="ml-2">✓</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -811,6 +940,11 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
             <p className="text-gray-400 text-sm">
               Sistem akan mengoptimalkan penggunaan bahan yang ada, lalu melengkapi dengan resep dataset dan saran AI
             </p>
+            {getCurrentWeekPlan() && (
+              <p className="text-blue-600 text-sm font-medium">
+                Anda sudah memiliki rencana untuk minggu ini. Klik "Buat Rencana Menu" untuk membuat yang baru.
+              </p>
+            )}
           </div>
         </div>
       )}
