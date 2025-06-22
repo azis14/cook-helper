@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, ShoppingCart, Clock, Users, Plus, Trash2, RefreshCw, ChefHat, Sparkles, Database } from 'lucide-react';
+import { Calendar, ShoppingCart, Clock, Users, Plus, Trash2, RefreshCw, ChefHat, Sparkles, Database, CheckCircle } from 'lucide-react';
 import { Recipe, WeeklyPlan, DailyMeals, ShoppingItem, Ingredient } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
