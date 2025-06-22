@@ -1,4 +1,4 @@
-# Cook Assistant - Smart Recipe Application
+# Cook Assistant - Smart Cooking Assistant Application
 
 A smart cooking assistant application built with React, TypeScript, and Supabase that helps users manage ingredients, discover recipes, and get AI-powered recommendations.
 
