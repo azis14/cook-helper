@@ -63,12 +63,6 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
     localStorage.setItem('saved-rag-recipe-ids', JSON.stringify(Array.from(savedRecipeIds)));
   }, [savedRecipeIds]);
 
-  // Clear recommendations when component mounts or when switching to this tab
-  useEffect(() => {
-    setRecommendations([]);
-    setSearchQuery('');
-  }, []); // Only run on mount
-
   // Initialize service silently in the background
   useEffect(() => {
     ragService.initialize().catch(error => {
