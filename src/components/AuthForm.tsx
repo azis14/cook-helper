@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChefHat, Mail, Lock, User } from 'lucide-react';
 import { signIn, signUp, signInWithGoogle } from '../lib/supabase';
+import { Header } from './Header';
 import { Footer } from './Footer';
 
 interface AuthFormProps {
@@ -51,8 +52,11 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex flex-col mt-5">
-      <div className="flex-1 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50 flex flex-col">
+      <Header />
+      
+      {/* Main content area with proper spacing from header */}
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
@@ -114,15 +118,13 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                 Email
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="masukkan@email.com"
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder="nama@email.com"
                   required
                 />
               </div>
@@ -133,16 +135,15 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
                 Password
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder="Masukkan password"
                   required
+                  minLength={6}
                 />
               </div>
             </div>
@@ -150,7 +151,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
             <button
               type="submit"
               disabled={loading || googleLoading}
-              className="w-full bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-orange-500 text-white py-2 px-4 rounded-lg hover:bg-orange-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {loading ? 'Memproses...' : (isLogin ? 'Masuk' : 'Daftar')}
             </button>
@@ -159,13 +160,14 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onSuccess }) => {
           <div className="mt-6 text-center">
             <button
               onClick={() => setIsLogin(!isLogin)}
-              className="text-orange-600 hover:text-orange-700 text-sm"
+              className="text-orange-600 hover:text-orange-800 text-sm"
             >
               {isLogin ? 'Belum punya akun? Daftar di sini' : 'Sudah punya akun? Masuk di sini'}
             </button>
           </div>
         </div>
       </div>
+
       <Footer />
     </div>
   );
