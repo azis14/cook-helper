@@ -70,14 +70,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       onSuccess('Profil berhasil diperbarui!');
       onClose();
     } catch (error: any) {
-      console.error('Profile update error:', error);
-      
       // Check if the error is due to duplicate username
       if (error?.message?.includes('duplicate key value violates unique constraint "user_profiles_username_key"') ||
           error?.code === '23505' ||
           (error?.body && typeof error.body === 'string' && error.body.includes('user_profiles_username_key'))) {
+        // This is an expected validation error, log as warning instead of error
+        console.warn('Username already exists:', error);
         onError('Username sudah digunakan. Silakan pilih username lain.');
       } else {
+        // This is an unexpected error, log as error
+        console.error('Profile update error:', error);
         onError('Gagal memperbarui profil. Silakan coba lagi.');
       }
     } finally {
