@@ -12,6 +12,7 @@ import { AuthForm } from './components/AuthForm';
 import { ResetPasswordForm } from './components/ResetPasswordForm';
 import { Toast } from './components/Toast';
 import { UserProfileModal } from './components/UserProfileModal';
+import { FeedbackButton } from './components/FeedbackButton';
 import { useAuth } from './hooks/useAuth';
 import { useIngredients } from './hooks/useIngredients';
 import { useRecipes } from './hooks/useRecipes';
@@ -184,6 +185,9 @@ function App() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Feedback Button - only show for authenticated users */}
+      {user && <FeedbackButton />}
 
       {/* User Profile Modal */}
       {user && (
