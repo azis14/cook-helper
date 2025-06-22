@@ -116,6 +116,115 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     dinner: 'Makan Malam',
   };
 
+  // Helper function to calculate ingredient match score for a recipe
+  const calculateIngredientMatch = (recipe: Recipe, availableIngredients: string[]): number => {
+    if (!recipe.recipe_ingredients || recipe.recipe_ingredients.length === 0) return 0;
+    
+    const recipeIngredients = recipe.recipe_ingredients.map(ing => ing.name.toLowerCase());
+    const matches = recipeIngredients.filter(recipeIng => 
+      availableIngredients.some(available => 
+        available.includes(recipeIng) || recipeIng.includes(available)
+      )
+    );
+    
+    return matches.length / recipeIngredients.length;
+  };
+
+  // Helper function to create AI recipes for empty slots
+  const generateAIRecipesForEmptySlots = async (
+    emptySlots: Array<{day: number, meal: string}>,
+    geminiService: GeminiService,
+    usedIngredients: Set<string>
+  ): Promise<Recipe[]> => {
+    if (emptySlots.length === 0) return [];
+
+    try {
+      // Create a prompt that considers used ingredients and meal types
+      const mealTypes = emptySlots.map(slot => `${slot.meal} untuk hari ke-${slot.day + 1}`);
+      const availableIngredientNames = ingredients
+        .filter(ing => !usedIngredients.has(ing.name.toLowerCase()))
+        .map(ing => `${ing.name} (${ing.quantity} ${ing.unit})`);
+
+      const prompt = `
+Saya memiliki bahan-bahan berikut: ${availableIngredientNames.join(', ')}
+
+Tolong buatkan ${emptySlots.length} resep masakan Indonesia yang berbeda untuk:
+${mealTypes.join(', ')}
+
+Pastikan setiap resep:
+1. Menggunakan bahan yang tersedia
+2. Sesuai dengan waktu makan (sarapan lebih ringan, makan siang/malam lebih lengkap)
+3. Mudah dibuat dan praktis
+4. Bervariasi (tidak ada yang sama)
+
+Berikan respon dalam format JSON yang valid dengan struktur berikut:
+
+\`\`\`json
+{
+  "recipes": [
+    {
+      "name": "Nama Resep",
+      "description": "Deskripsi singkat resep",
+      "ingredients": [
+        {
+          "name": "nama bahan",
+          "quantity": 1,
+          "unit": "satuan"
+        }
+      ],
+      "instructions": [
+        "Langkah 1",
+        "Langkah 2"
+      ],
+      "prepTime": 15,
+      "cookTime": 30,
+      "servings": 4,
+      "difficulty": "easy",
+      "tags": ["tag1", "tag2"]
+    }
+  ]
+}
+\`\`\`
+
+PENTING: JSON harus valid tanpa komentar atau karakter khusus.
+`;
+
+      const result = await geminiService.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+      if (!jsonMatch || !jsonMatch[1]) {
+        throw new Error('Invalid AI response format');
+      }
+
+      const parsedResponse = JSON.parse(jsonMatch[1]);
+      
+      return parsedResponse.recipes.map((recipe: any, index: number) => ({
+        id: `ai-weekly-${Date.now()}-${index}`,
+        name: recipe.name,
+        description: recipe.description,
+        prep_time: recipe.prepTime || 15,
+        cook_time: recipe.cookTime || 30,
+        servings: recipe.servings || 4,
+        difficulty: recipe.difficulty || 'easy',
+        instructions: recipe.instructions || [],
+        tags: recipe.tags || [],
+        user_id: 'ai-generated',
+        recipe_ingredients: (recipe.ingredients || []).map((ing: any, ingIndex: number) => ({
+          id: `ai-weekly-${Date.now()}-${index}-ing-${ingIndex}`,
+          recipe_id: `ai-weekly-${Date.now()}-${index}`,
+          name: ing.name,
+          quantity: ing.quantity || 1,
+          unit: ing.unit || 'secukupnya',
+        })),
+      }));
+    } catch (error) {
+      console.error('Error generating AI recipes for empty slots:', error);
+      return [];
+    }
+  };
+
   const generateWeeklyPlan = async (targetPeopleCount: number) => {
     setIsGenerating(true);
     setPeopleCount(targetPeopleCount);
@@ -134,15 +243,31 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
         geminiService = new GeminiService(apiKey);
       }
 
-      // Create a pool of available recipes
+      // Create ingredient optimization tracking
+      const availableIngredientNames = ingredients.map(ing => ing.name.toLowerCase());
+      const usedIngredients = new Set<string>();
+
+      // Create pools of recipes sorted by ingredient match
+      setGenerationProgress('Mengoptimalkan penggunaan bahan...');
+      
       let availableRecipes = [...recipes];
       let datasetRecipes: any[] = [];
       
+      // Sort saved recipes by ingredient match score
+      availableRecipes = availableRecipes
+        .map(recipe => ({
+          ...recipe,
+          matchScore: calculateIngredientMatch(recipe, availableIngredientNames)
+        }))
+        .sort((a, b) => b.matchScore - a.matchScore);
+
       // Get dataset recipes if feature is enabled
       if (isFeatureEnabledSync('dataset')) {
         setGenerationProgress('Mengambil resep dari dataset...');
         try {
-          datasetRecipes = await datasetService.getRecommendations(ingredients, 50, 20);
+          datasetRecipes = await datasetService.getRecommendations(ingredients, 30, 30);
+          // Sort by match score
+          datasetRecipes.sort((a, b) => b.match_score - a.match_score);
         } catch (error) {
           console.warn('Failed to get dataset recipes:', error);
         }
@@ -150,74 +275,139 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
 
       setGenerationProgress('Menyusun menu untuk 7 hari...');
 
-      // Generate meals for 7 days
+      // Initialize daily meals structure
       for (let i = 0; i < 7; i++) {
         const date = new Date();
         date.setDate(date.getDate() + i);
         
-        const dayMeals: DailyMeals = {
+        dailyMeals.push({
           date: date.toISOString().slice(0, 10),
-        };
-
-        // For each meal type, try to assign a recipe
-        for (const mealType of meals) {
-          let assignedRecipe: Recipe | null = null;
-
-          // Priority 1: Use saved recipes (80% preference)
-          if (availableRecipes.length > 0 && Math.random() > 0.2) {
-            const randomIndex = Math.floor(Math.random() * availableRecipes.length);
-            assignedRecipe = availableRecipes[randomIndex];
-            
-            // Remove from available pool to avoid repetition
-            availableRecipes.splice(randomIndex, 1);
-          }
-          // Priority 2: Use dataset recipes
-          else if (datasetRecipes.length > 0 && Math.random() > 0.3) {
-            const randomIndex = Math.floor(Math.random() * datasetRecipes.length);
-            assignedRecipe = datasetRecipes[randomIndex];
-            
-            // Remove from available pool
-            datasetRecipes.splice(randomIndex, 1);
-          }
-
-          // Assign the recipe to the meal
-          if (assignedRecipe) {
-            dayMeals[mealType as keyof DailyMeals] = assignedRecipe;
-          }
-        }
-        
-        dailyMeals.push(dayMeals);
+        });
       }
 
-      // Fill empty slots with AI suggestions if available
+      // Phase 1: Fill with saved recipes (prioritize high ingredient match)
+      let recipeIndex = 0;
+      for (let dayIndex = 0; dayIndex < 7 && recipeIndex < availableRecipes.length; dayIndex++) {
+        for (const mealType of meals) {
+          if (recipeIndex >= availableRecipes.length) break;
+          
+          const recipe = availableRecipes[recipeIndex];
+          dailyMeals[dayIndex][mealType as keyof DailyMeals] = recipe;
+          
+          // Track used ingredients
+          if (recipe.recipe_ingredients) {
+            recipe.recipe_ingredients.forEach(ing => {
+              usedIngredients.add(ing.name.toLowerCase());
+            });
+          }
+          
+          recipeIndex++;
+        }
+      }
+
+      // Phase 2: Fill remaining slots with dataset recipes
+      if (datasetRecipes.length > 0) {
+        setGenerationProgress('Menambahkan resep dari dataset...');
+        let datasetIndex = 0;
+        
+        for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+          for (const mealType of meals) {
+            if (!dailyMeals[dayIndex][mealType as keyof DailyMeals] && datasetIndex < datasetRecipes.length) {
+              const recipe = datasetRecipes[datasetIndex];
+              dailyMeals[dayIndex][mealType as keyof DailyMeals] = recipe;
+              
+              // Track used ingredients
+              if (recipe.recipe_ingredients) {
+                recipe.recipe_ingredients.forEach((ing: any) => {
+                  usedIngredients.add(ing.name.toLowerCase());
+                });
+              }
+              
+              datasetIndex++;
+            }
+          }
+        }
+      }
+
+      // Phase 3: Fill remaining empty slots with AI-generated recipes
       if (geminiService && isFeatureEnabledSync('suggestions')) {
         setGenerationProgress('Mengisi slot kosong dengan saran AI...');
         
-        const emptySlots = dailyMeals.reduce((count, day) => {
-          return count + meals.filter(meal => !day[meal as keyof DailyMeals]).length;
-        }, 0);
+        // Find empty slots
+        const emptySlots: Array<{day: number, meal: string}> = [];
+        for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+          for (const mealType of meals) {
+            if (!dailyMeals[dayIndex][mealType as keyof DailyMeals]) {
+              emptySlots.push({ day: dayIndex, meal: mealType });
+            }
+          }
+        }
 
-        if (emptySlots > 0) {
+        if (emptySlots.length > 0) {
           try {
-            // Generate AI recipes for empty slots
-            const aiRecipes = await geminiService.generateRecipeSuggestions(ingredients);
-            let aiRecipeIndex = 0;
-
-            for (const day of dailyMeals) {
-              for (const mealType of meals) {
-                if (!day[mealType as keyof DailyMeals] && aiRecipeIndex < aiRecipes.length) {
-                  day[mealType as keyof DailyMeals] = aiRecipes[aiRecipeIndex];
-                  aiRecipeIndex++;
-                }
+            const aiRecipes = await generateAIRecipesForEmptySlots(emptySlots, geminiService, usedIngredients);
+            
+            // Assign AI recipes to empty slots
+            let aiIndex = 0;
+            for (const slot of emptySlots) {
+              if (aiIndex < aiRecipes.length) {
+                dailyMeals[slot.day][slot.meal as keyof DailyMeals] = aiRecipes[aiIndex];
+                aiIndex++;
               }
             }
           } catch (error) {
-            console.warn('Failed to generate AI recipes:', error);
+            console.warn('Failed to generate AI recipes for empty slots:', error);
           }
         }
       }
 
+      // Phase 4: Final fallback - create simple placeholder recipes for any remaining empty slots
       setGenerationProgress('Menyelesaikan rencana menu...');
+      
+      const fallbackRecipes = [
+        { name: 'Nasi Putih + Telur Dadar', meal: 'breakfast' },
+        { name: 'Mie Instan + Telur', meal: 'breakfast' },
+        { name: 'Roti Bakar + Selai', meal: 'breakfast' },
+        { name: 'Nasi + Ayam Goreng', meal: 'lunch' },
+        { name: 'Nasi + Ikan Bakar', meal: 'lunch' },
+        { name: 'Nasi + Sayur Sop', meal: 'lunch' },
+        { name: 'Nasi + Rendang', meal: 'dinner' },
+        { name: 'Nasi + Gudeg', meal: 'dinner' },
+        { name: 'Nasi + Soto Ayam', meal: 'dinner' },
+      ];
+
+      let fallbackIndex = 0;
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        for (const mealType of meals) {
+          if (!dailyMeals[dayIndex][mealType as keyof DailyMeals]) {
+            const fallback = fallbackRecipes[fallbackIndex % fallbackRecipes.length];
+            
+            dailyMeals[dayIndex][mealType as keyof DailyMeals] = {
+              id: `fallback-${dayIndex}-${mealType}`,
+              name: fallback.name,
+              description: 'Resep sederhana untuk melengkapi rencana menu',
+              prep_time: 10,
+              cook_time: 15,
+              servings: targetPeopleCount,
+              difficulty: 'easy' as const,
+              instructions: ['Siapkan bahan-bahan', 'Masak sesuai cara biasa', 'Sajikan hangat'],
+              tags: ['sederhana', 'cepat'],
+              user_id: 'fallback',
+              recipe_ingredients: [
+                {
+                  id: `fallback-${dayIndex}-${mealType}-ing-1`,
+                  recipe_id: `fallback-${dayIndex}-${mealType}`,
+                  name: 'Bahan utama',
+                  quantity: 1,
+                  unit: 'porsi',
+                }
+              ],
+            };
+            
+            fallbackIndex++;
+          }
+        }
+      }
       
       const newPlan: WeeklyPlan = {
         id: 'plan-' + Date.now(),
@@ -231,6 +421,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
       
     } catch (error) {
       console.error('Error generating weekly plan:', error);
+      setGenerationProgress('Terjadi kesalahan saat membuat rencana menu');
     } finally {
       setIsGenerating(false);
       setGenerationProgress('');
@@ -266,23 +457,30 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
       });
     });
 
-    // Check what we already have
+    // Check what we already have and optimize usage
     const availableIngredients = ingredients.reduce((acc, ing) => {
       acc[ing.name.toLowerCase()] = ing.quantity;
       return acc;
     }, {} as Record<string, number>);
 
-    // Mark items as needed or not
+    // Mark items as needed or not, prioritizing existing ingredients
     Object.values(neededIngredients).forEach(item => {
       const available = availableIngredients[item.name.toLowerCase()] || 0;
       if (available >= item.quantity) {
         item.needed = false;
+        item.quantity = 0; // We have enough
       } else {
         item.quantity = Math.max(0, item.quantity - available);
+        item.needed = item.quantity > 0;
       }
     });
 
-    setShoppingList(Object.values(neededIngredients));
+    // Filter out items with 0 quantity
+    const filteredList = Object.values(neededIngredients).filter(item => 
+      item.needed || item.quantity > 0
+    );
+
+    setShoppingList(filteredList);
   };
 
   const assignMealToDay = (dayIndex: number, mealType: keyof DailyMeals, recipe: Recipe | null) => {
@@ -304,10 +502,12 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
   };
 
   const getRecipeSource = (recipe: Recipe) => {
-    if (recipe.user_id === 'ai-generated' || recipe.id.startsWith('gemini-')) {
+    if (recipe.user_id === 'ai-generated' || recipe.id.startsWith('gemini-') || recipe.id.startsWith('ai-weekly-')) {
       return { type: 'ai', icon: Sparkles, color: 'text-purple-500' };
     } else if (recipe.user_id === 'dataset') {
       return { type: 'dataset', icon: Database, color: 'text-blue-500' };
+    } else if (recipe.user_id === 'fallback') {
+      return { type: 'fallback', icon: ChefHat, color: 'text-gray-500' };
     } else {
       return { type: 'saved', icon: ChefHat, color: 'text-green-500' };
     }
@@ -322,6 +522,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     clove: 'siung',
     piring: 'piring',
     butir: 'butir',
+    porsi: 'porsi',
     secukupnya: 'secukupnya',
   };
 
@@ -330,7 +531,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Rencana Menu Mingguan</h2>
-          <p className="text-gray-600 mt-1">Rencanakan menu makan untuk seminggu dengan efisien</p>
+          <p className="text-gray-600 mt-1">Rencanakan menu makan untuk seminggu dengan optimasi bahan</p>
         </div>
         <button
           onClick={() => setShowPeopleModal(true)}
@@ -380,7 +581,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
             <div className="flex flex-wrap gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <ChefHat className="text-green-500" size={16} />
-                <span>Resep Tersimpan</span>
+                <span>Resep Tersimpan (Prioritas Utama)</span>
               </div>
               <div className="flex items-center gap-2">
                 <Database className="text-blue-500" size={16} />
@@ -389,6 +590,10 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
               <div className="flex items-center gap-2">
                 <Sparkles className="text-purple-500" size={16} />
                 <span>Saran AI</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <ChefHat className="text-gray-500" size={16} />
+                <span>Resep Sederhana</span>
               </div>
             </div>
           </div>
@@ -467,7 +672,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
               <div className="flex items-center gap-2 mb-4">
                 <ShoppingCart className="text-green-600" size={24} />
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Daftar Belanja untuk {peopleCount} Orang
+                  Daftar Belanja Optimal untuk {peopleCount} Orang
                 </h3>
               </div>
               
@@ -487,6 +692,9 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
                       </li>
                     ))}
                   </ul>
+                  {shoppingList.filter(item => item.needed).length === 0 && (
+                    <p className="text-sm text-gray-500 italic">Semua bahan sudah tersedia!</p>
+                  )}
                 </div>
                 
                 <div>
@@ -505,7 +713,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-gray-800 mb-2">Ringkasan</h4>
+                  <h4 className="font-medium text-gray-800 mb-2">Ringkasan Optimasi</h4>
                   <div className="text-sm space-y-1">
                     <div className="flex justify-between">
                       <span>Total item:</span>
@@ -523,6 +731,12 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
                         {shoppingList.filter(item => !item.needed).length}
                       </span>
                     </div>
+                    <div className="flex justify-between pt-2 border-t">
+                      <span>Efisiensi:</span>
+                      <span className="font-medium text-purple-600">
+                        {Math.round((shoppingList.filter(item => !item.needed).length / Math.max(shoppingList.length, 1)) * 100)}%
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -535,10 +749,19 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
         <div className="text-center py-12">
           <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
           <div className="space-y-2">
-            <p className="text-gray-500 font-medium">Buat rencana menu mingguan pertama Anda!</p>
+            <p className="text-gray-500 font-medium">Buat rencana menu mingguan yang optimal!</p>
             <p className="text-gray-400 text-sm">
-              Sistem akan memprioritaskan resep tersimpan Anda, lalu mengisi dengan resep dataset dan saran AI
+              Sistem akan mengoptimalkan penggunaan bahan yang ada, lalu melengkapi dengan resep dataset dan saran AI
             </p>
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+              <h4 className="font-medium text-blue-900 mb-2">Strategi Optimasi:</h4>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>1. Prioritas resep tersimpan dengan bahan yang ada</li>
+                <li>2. Tambahkan resep dataset populer</li>
+                <li>3. AI mengisi slot kosong dengan variasi</li>
+                <li>4. Optimasi daftar belanja</li>
+              </ul>
+            </div>
           </div>
         </div>
       )}
