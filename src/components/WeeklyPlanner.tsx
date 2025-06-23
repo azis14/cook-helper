@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, ShoppingCart, Clock, Users, Plus, Trash2, RefreshCw, ChefHat, Sparkles, Database, CheckCircle, Eye, Save, Archive, Edit3 } from 'lucide-react';
+import { Calendar, ShoppingCart, Clock, Users, Plus, Trash2, RefreshCw, ChefHat, Sparkles, Database, CheckCircle, Eye, Save, Archive, Edit3, Search, X } from 'lucide-react';
 import { Recipe, WeeklyPlan, DailyMeals, ShoppingItem, Ingredient } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useRecipes } from '../hooks/useRecipes';
@@ -24,6 +24,16 @@ interface PeopleCountModalProps {
 interface DailyRecipes {
   date: string;
   recipes: (Recipe | null)[];
+}
+
+interface RecipeSelectionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectRecipe: (recipe: Recipe) => void;
+  savedRecipes: Recipe[];
+  ingredients: Ingredient[];
+  dayName: string;
+  slotNumber: number;
 }
 
 const PeopleCountModal: React.FC<PeopleCountModalProps> = ({ isOpen, onClose, onConfirm }) => {
@@ -104,6 +114,278 @@ const PeopleCountModal: React.FC<PeopleCountModalProps> = ({ isOpen, onClose, on
   );
 };
 
+const RecipeSelectionModal: React.FC<RecipeSelectionModalProps> = ({
+  isOpen,
+  onClose,
+  onSelectRecipe,
+  savedRecipes,
+  ingredients,
+  dayName,
+  slotNumber,
+}) => {
+  const [activeTab, setActiveTab] = useState<'saved' | 'dataset'>('saved');
+  const [datasetRecipes, setDatasetRecipes] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredSavedRecipes, setFilteredSavedRecipes] = useState<Recipe[]>([]);
+
+  // Filter saved recipes based on search
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const filtered = savedRecipes.filter(recipe =>
+        recipe.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        recipe.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        recipe.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+      setFilteredSavedRecipes(filtered);
+    } else {
+      setFilteredSavedRecipes(savedRecipes);
+    }
+  }, [searchQuery, savedRecipes]);
+
+  // Load dataset recipes when tab is switched
+  useEffect(() => {
+    if (activeTab === 'dataset' && isFeatureEnabledSync('dataset')) {
+      loadDatasetRecipes();
+    }
+  }, [activeTab]);
+
+  const loadDatasetRecipes = async () => {
+    setLoading(true);
+    try {
+      const datasetService = new SupabaseDatasetService();
+      const recommendations = await datasetService.getRecommendations(ingredients, 30, 20);
+      setDatasetRecipes(recommendations);
+    } catch (error) {
+      console.error('Error loading dataset recipes:', error);
+      setDatasetRecipes([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRecipeSelect = (recipe: Recipe) => {
+    onSelectRecipe(recipe);
+    onClose();
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={handleBackdropClick}
+    >
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Pilih Resep untuk {dayName} - Slot {slotNumber}
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Pilih dari resep tersimpan atau jelajahi dataset komunitas
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <X size={20} className="text-gray-500" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('saved')}
+            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+              activeTab === 'saved'
+                ? 'text-green-600 border-b-2 border-green-600 bg-green-50'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <ChefHat size={16} />
+              Resep Tersimpan ({savedRecipes.length})
+            </div>
+          </button>
+          {isFeatureEnabledSync('dataset') && (
+            <button
+              onClick={() => setActiveTab('dataset')}
+              className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+                activeTab === 'dataset'
+                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <Database size={16} />
+                Dataset Komunitas
+              </div>
+            </button>
+          )}
+        </div>
+
+        {/* Search Bar */}
+        {activeTab === 'saved' && (
+          <div className="p-4 border-b border-gray-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari resep tersimpan..."
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {activeTab === 'saved' && (
+            <div>
+              {filteredSavedRecipes.length === 0 ? (
+                <div className="text-center py-12">
+                  <ChefHat size={48} className="mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500">
+                    {searchQuery ? 'Tidak ada resep yang cocok dengan pencarian' : 'Belum ada resep tersimpan'}
+                  </p>
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="mt-2 text-green-600 hover:text-green-800 text-sm"
+                    >
+                      Hapus pencarian
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredSavedRecipes.map((recipe) => (
+                    <div
+                      key={recipe.id}
+                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => handleRecipeSelect(recipe)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-medium text-gray-900 line-clamp-2 flex-1">
+                          {recipe.name}
+                        </h4>
+                        <ChefHat className="text-green-500 ml-2" size={16} />
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                        {recipe.description}
+                      </p>
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <div className="flex items-center gap-1">
+                          <Clock size={12} />
+                          <span>{recipe.prep_time + recipe.cook_time} menit</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Users size={12} />
+                          <span>{recipe.servings} porsi</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'dataset' && (
+            <div>
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Memuat resep dari dataset...</p>
+                </div>
+              ) : datasetRecipes.length === 0 ? (
+                <div className="text-center py-12">
+                  <Database size={48} className="mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500">
+                    Tidak ada resep dataset yang cocok dengan bahan Anda
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {datasetRecipes.map((recipe) => (
+                    <div
+                      key={recipe.id}
+                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => handleRecipeSelect(recipe)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-medium text-gray-900 line-clamp-2 flex-1">
+                          {recipe.name}
+                        </h4>
+                        <div className="flex items-center gap-1 ml-2">
+                          <Database className="text-blue-500" size={16} />
+                          {(recipe as any).loves_count && (
+                            <span className="text-xs text-gray-500">
+                              {(recipe as any).loves_count} ❤️
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                        {recipe.description}
+                      </p>
+                      <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
+                        <div className="flex items-center gap-1">
+                          <Clock size={12} />
+                          <span>{recipe.prep_time + recipe.cook_time} menit</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Users size={12} />
+                          <span>{recipe.servings} porsi</span>
+                        </div>
+                      </div>
+                      {(recipe as any).match_score && (
+                        <div className="text-xs text-blue-600">
+                          {Math.round((recipe as any).match_score * 100)}% cocok dengan bahan Anda
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <div>
+              {activeTab === 'saved' ? (
+                <span>Pilih dari {filteredSavedRecipes.length} resep tersimpan</span>
+              ) : (
+                <span>Pilih dari {datasetRecipes.length} resep dataset</span>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
   recipes,
   ingredients,
@@ -129,6 +411,12 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [savingRecipeId, setSavingRecipeId] = useState<string | null>(null);
   const [planSaved, setPlanSaved] = useState(false);
+  const [showRecipeSelection, setShowRecipeSelection] = useState(false);
+  const [selectionContext, setSelectionContext] = useState<{
+    dayIndex: number;
+    slotIndex: number;
+    dayName: string;
+  } | null>(null);
 
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
@@ -643,14 +931,16 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
   const addRecipeToDay = (dayIndex: number) => {
     if (!weeklyPlan) return;
     
-    const updatedPlan = { ...weeklyPlan };
-    const currentRecipes = updatedPlan.daily_recipes[dayIndex].recipes;
+    const currentRecipes = weeklyPlan.daily_recipes[dayIndex].recipes;
     
     // Only add if less than 3 recipes
     if (currentRecipes.length < 3) {
-      updatedPlan.daily_recipes[dayIndex].recipes.push(null);
-      setWeeklyPlan(updatedPlan);
-      setPlanSaved(false);
+      setSelectionContext({
+        dayIndex,
+        slotIndex: currentRecipes.length,
+        dayName: days[dayIndex]
+      });
+      setShowRecipeSelection(true);
     }
   };
 
@@ -958,6 +1248,47 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
               </div>
             ))}
           </div>
+
+          {shoppingList.length > 0 && (
+            <div className="bg-white rounded-lg shadow-md border border-green-100 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <ShoppingCart className="text-green-600" size={24} />
+                <h3 className="text-lg font-semibold text-gray-900">Daftar Belanja</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <h4 className="font-medium text-green-800 mb-2">Perlu Dibeli</h4>
+                  <ul className="space-y-1">
+                    {shoppingList.filter(item => item.needed).map(item => (
+                      <li key={item.id} className="text-sm text-gray-700">
+                        <span className="font-medium">
+                          {item.name}
+                        </span>
+                        <span className="text-gray-500 ml-2">
+                          {item.quantity} {unitTranslations[item.unit] || item.unit}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-blue-800 mb-2">Sudah Ada</h4>
+                  <ul className="space-y-1">
+                    {shoppingList.filter(item => !item.needed).map(item => (
+                      <li key={item.id} className="text-sm text-gray-500">
+                        <span>
+                          {item.name}
+                        </span>
+                        <span className="ml-2">✓</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -987,6 +1318,26 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
         onClose={() => setShowPeopleModal(false)}
         onConfirm={generateWeeklyPlan}
       />
+
+      {/* Recipe Selection Modal */}
+      {selectionContext && (
+        <RecipeSelectionModal
+          isOpen={showRecipeSelection}
+          onClose={() => {
+            setShowRecipeSelection(false);
+            setSelectionContext(null);
+          }}
+          onSelectRecipe={(recipe) => {
+            if (selectionContext) {
+              assignRecipeToSlot(selectionContext.dayIndex, selectionContext.slotIndex, recipe);
+            }
+          }}
+          savedRecipes={recipes}
+          ingredients={ingredients}
+          dayName={selectionContext.dayName}
+          slotNumber={selectionContext.slotIndex + 1}
+        />
+      )}
 
       {/* Recipe Detail Modal */}
       {selectedRecipe && (
