@@ -645,47 +645,6 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
               </div>
             ))}
           </div>
-
-          {shoppingList.length > 0 && (
-            <div className="bg-white rounded-lg shadow-md border border-green-100 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <ShoppingCart className="text-green-600" size={24} />
-                <h3 className="text-lg font-semibold text-gray-900">Daftar Belanja</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <h4 className="font-medium text-green-800 mb-2">Perlu Dibeli</h4>
-                  <ul className="space-y-1">
-                    {shoppingList.filter(item => item.needed).map(item => (
-                      <li key={item.id} className="text-sm text-gray-700">
-                        <span className="font-medium">
-                          {item.name}
-                        </span>
-                        <span className="text-gray-500 ml-2">
-                          {item.quantity} {unitTranslations[item.unit] || item.unit}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                
-                <div>
-                  <h4 className="font-medium text-blue-800 mb-2">Sudah Ada</h4>
-                  <ul className="space-y-1">
-                    {shoppingList.filter(item => !item.needed).map(item => (
-                      <li key={item.id} className="text-sm text-gray-500">
-                        <span>
-                          {item.name}
-                        </span>
-                        <span className="ml-2">✓</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
