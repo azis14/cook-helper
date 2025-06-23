@@ -365,6 +365,7 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
         try {
           datasetRecipes = await datasetService.getRecommendations(ingredients, 30, 50);
           datasetRecipes.sort((a, b) => b.match_score - a.match_score);
+          console.log('Dataset recipes loaded:', datasetRecipes.length);
         } catch (error) {
           console.warn('Failed to get dataset recipes:', error);
         }
@@ -509,6 +510,26 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
             }
           } catch (error) {
             console.warn('Failed to generate AI recipes for empty days:', error);
+          }
+        }
+      }
+
+      // Phase 4: Fill remaining empty slots with additional dataset/AI recipes if available
+      setGenerationProgress('Melengkapi rencana menu...');
+      
+      // Try to fill more slots with dataset recipes
+      if (datasetRecipes.length > 0) {
+        let datasetIndex = 0;
+        for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+          while (dailyRecipes[dayIndex].recipes.length < 2 && datasetIndex < datasetRecipes.length) {
+            const recipe = datasetRecipes[datasetIndex];
+            // Check if recipe is not already used in this day
+            const alreadyUsed = dailyRecipes[dayIndex].recipes.some(r => r?.id === recipe.id);
+            if (!alreadyUsed) {
+              dailyRecipes[dayIndex].recipes.push(recipe);
+              console.log(`Added extra dataset recipe to day ${dayIndex + 1}: ${recipe.name}`);
+            }
+            datasetIndex++;
           }
         }
       }
