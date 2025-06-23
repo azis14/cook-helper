@@ -157,20 +157,15 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
           const recipes: (Recipe | null)[] = [];
           
           if (dayMeal) {
-            // Add recipes in order: breakfast, lunch, dinner
+            // Add recipes in order: breakfast, lunch, dinner (only if they exist)
             if (dayMeal.breakfast) recipes.push(dayMeal.breakfast);
             if (dayMeal.lunch) recipes.push(dayMeal.lunch);
             if (dayMeal.dinner) recipes.push(dayMeal.dinner);
           }
           
-          // Ensure we have exactly 3 slots (fill with null if needed)
-          while (recipes.length < 3) {
-            recipes.push(null);
-          }
-          
           dailyRecipes.push({
             date: dateString,
-            recipes: recipes.slice(0, 3) // Ensure max 3
+            recipes: recipes // Keep actual count, don't pad to 3
           });
         }
         
@@ -377,32 +372,50 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
 
       setGenerationProgress('Menyusun menu untuk 7 hari...');
 
-      // Initialize daily recipes structure (3 recipes per day)
+      // Initialize daily recipes structure (start with empty arrays)
       for (let i = 0; i < 7; i++) {
         const date = new Date();
         date.setDate(date.getDate() + i);
         
         dailyRecipes.push({
           date: date.toISOString().slice(0, 10),
-          recipes: [null, null, null] // 3 slots per day
+          recipes: [] // Start with empty array
         });
       }
 
-      // Phase 1: PRIORITIZE SAVED RECIPES - Fill as many slots as possible with saved recipes
+      // Phase 1: PRIORITIZE SAVED RECIPES - Distribute across days ensuring each day gets at least 1
       let recipeIndex = 0;
-      let totalSlots = 21; // 7 days × 3 recipes
       let slotsFilledWithSaved = 0;
 
-      // First pass: Fill with saved recipes that have good ingredient matches
+      // First pass: Give each day at least 1 saved recipe if available
       for (let dayIndex = 0; dayIndex < 7 && recipeIndex < availableRecipes.length; dayIndex++) {
-        for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
-          if (recipeIndex >= availableRecipes.length) break;
+        const recipe = availableRecipes[recipeIndex];
+        
+        // Only use saved recipes with decent ingredient match (>= 0.2) or if we have many saved recipes
+        if (recipe.matchScore >= 0.2 || availableRecipes.length >= 10) {
+          dailyRecipes[dayIndex].recipes.push(recipe);
           
+          // Track used ingredients
+          if (recipe.recipe_ingredients) {
+            recipe.recipe_ingredients.forEach(ing => {
+              usedIngredients.add(ing.name.toLowerCase());
+            });
+          }
+          
+          slotsFilledWithSaved++;
+          console.log(`Filled day ${dayIndex + 1} with saved recipe: ${recipe.name} (score: ${recipe.matchScore})`);
+        }
+        
+        recipeIndex++;
+      }
+
+      // Second pass: Add more saved recipes to days that can accommodate them (max 3 per day)
+      for (let dayIndex = 0; dayIndex < 7 && recipeIndex < availableRecipes.length; dayIndex++) {
+        while (dailyRecipes[dayIndex].recipes.length < 3 && recipeIndex < availableRecipes.length) {
           const recipe = availableRecipes[recipeIndex];
           
-          // Only use saved recipes with decent ingredient match (>= 0.2) or if we have many saved recipes
           if (recipe.matchScore >= 0.2 || availableRecipes.length >= 10) {
-            dailyRecipes[dayIndex].recipes[slotIndex] = recipe;
+            dailyRecipes[dayIndex].recipes.push(recipe);
             
             // Track used ingredients
             if (recipe.recipe_ingredients) {
@@ -412,75 +425,90 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
             }
             
             slotsFilledWithSaved++;
-            console.log(`Filled day ${dayIndex + 1} slot ${slotIndex + 1} with saved recipe: ${recipe.name} (score: ${recipe.matchScore})`);
+            console.log(`Added additional saved recipe to day ${dayIndex + 1}: ${recipe.name}`);
           }
           
           recipeIndex++;
         }
       }
 
-      console.log(`Phase 1 complete: ${slotsFilledWithSaved}/${totalSlots} slots filled with saved recipes`);
+      console.log(`Phase 1 complete: ${slotsFilledWithSaved} slots filled with saved recipes`);
 
-      // Phase 2: Fill remaining slots with dataset recipes
+      // Phase 2: Fill days that still have no recipes with dataset recipes
       if (datasetRecipes.length > 0) {
         setGenerationProgress('Menambahkan resep dari dataset...');
         let datasetIndex = 0;
         let slotsFilledWithDataset = 0;
         
         for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-          for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
-            if (!dailyRecipes[dayIndex].recipes[slotIndex] && datasetIndex < datasetRecipes.length) {
-              const recipe = datasetRecipes[datasetIndex];
-              dailyRecipes[dayIndex].recipes[slotIndex] = recipe;
-              
-              // Track used ingredients
-              if (recipe.recipe_ingredients) {
-                recipe.recipe_ingredients.forEach((ing: any) => {
-                  usedIngredients.add(ing.name.toLowerCase());
-                });
-              }
-              
-              slotsFilledWithDataset++;
-              console.log(`Filled day ${dayIndex + 1} slot ${slotIndex + 1} with dataset recipe: ${recipe.name}`);
-              datasetIndex++;
+          // Ensure each day has at least 1 recipe
+          if (dailyRecipes[dayIndex].recipes.length === 0 && datasetIndex < datasetRecipes.length) {
+            const recipe = datasetRecipes[datasetIndex];
+            dailyRecipes[dayIndex].recipes.push(recipe);
+            
+            // Track used ingredients
+            if (recipe.recipe_ingredients) {
+              recipe.recipe_ingredients.forEach((ing: any) => {
+                usedIngredients.add(ing.name.toLowerCase());
+              });
             }
+            
+            slotsFilledWithDataset++;
+            console.log(`Filled empty day ${dayIndex + 1} with dataset recipe: ${recipe.name}`);
+            datasetIndex++;
+          }
+          
+          // Add more dataset recipes if there's room (max 3 per day)
+          while (dailyRecipes[dayIndex].recipes.length < 3 && datasetIndex < datasetRecipes.length) {
+            const recipe = datasetRecipes[datasetIndex];
+            dailyRecipes[dayIndex].recipes.push(recipe);
+            
+            // Track used ingredients
+            if (recipe.recipe_ingredients) {
+              recipe.recipe_ingredients.forEach((ing: any) => {
+                usedIngredients.add(ing.name.toLowerCase());
+              });
+            }
+            
+            slotsFilledWithDataset++;
+            console.log(`Added dataset recipe to day ${dayIndex + 1}: ${recipe.name}`);
+            datasetIndex++;
           }
         }
         
         console.log(`Phase 2 complete: ${slotsFilledWithDataset} additional slots filled with dataset recipes`);
       }
 
-      // Phase 3: Fill remaining empty slots with AI-generated recipes
+      // Phase 3: Fill days that still have no recipes with AI-generated recipes
       if (geminiService && isFeatureEnabledSync('suggestions')) {
-        setGenerationProgress('Mengisi slot kosong dengan saran AI...');
+        setGenerationProgress('Mengisi hari kosong dengan saran AI...');
         
-        // Find empty slots
-        const emptySlots: Array<{day: number, slot: number}> = [];
+        // Find days with no recipes
+        const emptyDays: number[] = [];
         for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-          for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
-            if (!dailyRecipes[dayIndex].recipes[slotIndex]) {
-              emptySlots.push({ day: dayIndex, slot: slotIndex });
-            }
+          if (dailyRecipes[dayIndex].recipes.length === 0) {
+            emptyDays.push(dayIndex);
           }
         }
 
-        console.log(`Phase 3: Found ${emptySlots.length} empty slots for AI generation`);
+        console.log(`Phase 3: Found ${emptyDays.length} empty days for AI generation`);
 
-        if (emptySlots.length > 0) {
+        if (emptyDays.length > 0) {
           try {
+            const emptySlots = emptyDays.map(day => ({ day, slot: 0 }));
             const aiRecipes = await generateAIRecipesForEmptySlots(emptySlots, geminiService, usedIngredients);
             
-            // Assign AI recipes to empty slots
+            // Assign AI recipes to empty days
             let aiIndex = 0;
-            for (const slot of emptySlots) {
+            for (const dayIndex of emptyDays) {
               if (aiIndex < aiRecipes.length) {
-                dailyRecipes[slot.day].recipes[slot.slot] = aiRecipes[aiIndex];
-                console.log(`Filled day ${slot.day + 1} slot ${slot.slot + 1} with AI recipe: ${aiRecipes[aiIndex].name}`);
+                dailyRecipes[dayIndex].recipes.push(aiRecipes[aiIndex]);
+                console.log(`Filled empty day ${dayIndex + 1} with AI recipe: ${aiRecipes[aiIndex].name}`);
                 aiIndex++;
               }
             }
           } catch (error) {
-            console.warn('Failed to generate AI recipes for empty slots:', error);
+            console.warn('Failed to generate AI recipes for empty days:', error);
           }
         }
       }
@@ -520,6 +548,7 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
       const dailyMeals: DailyMeals[] = weeklyPlan.daily_recipes.map(day => {
         const meal: DailyMeals = { date: day.date };
         
+        // Assign recipes to breakfast, lunch, dinner based on order
         if (day.recipes[0]) meal.breakfast = day.recipes[0];
         if (day.recipes[1]) meal.lunch = day.recipes[1];
         if (day.recipes[2]) meal.dinner = day.recipes[2];
@@ -596,12 +625,8 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
     const updatedPlan = { ...weeklyPlan };
     const currentRecipes = updatedPlan.daily_recipes[dayIndex].recipes;
     
-    // Find first empty slot or add if less than 3
-    const emptySlotIndex = currentRecipes.findIndex(recipe => recipe === null);
-    if (emptySlotIndex !== -1) {
-      // There's an empty slot, but we don't add anything here - user will select from dropdown
-      return;
-    } else if (currentRecipes.length < 3) {
+    // Only add if less than 3 recipes
+    if (currentRecipes.length < 3) {
       updatedPlan.daily_recipes[dayIndex].recipes.push(null);
       setWeeklyPlan(updatedPlan);
       setPlanSaved(false);
@@ -702,7 +727,7 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Rencana Menu Mingguan</h2>
-          <p className="text-gray-600 mt-1">Rencanakan 3 resep per hari dengan optimasi bahan</p>
+          <p className="text-gray-600 mt-1">Rencanakan menu fleksibel (0-3 resep per hari)</p>
         </div>
         <div className="flex items-center gap-3">
           {weeklyPlan && (
@@ -903,6 +928,11 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
                       Tambah Resep
                     </button>
                   )}
+                  
+                  {/* Show recipe count */}
+                  <div className="text-center text-xs text-gray-500">
+                    {day.recipes.length} resep
+                  </div>
                 </div>
               </div>
             ))}
@@ -957,12 +987,12 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
         <div className="text-center py-12">
           <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
           <div className="space-y-2">
-            <p className="text-gray-500 font-medium">Buat rencana menu mingguan yang optimal!</p>
+            <p className="text-gray-500 font-medium">Buat rencana menu mingguan yang fleksibel!</p>
             <p className="text-gray-400 text-sm">
               Sistem akan mengoptimalkan penggunaan bahan yang ada, lalu melengkapi dengan resep dataset dan saran AI
             </p>
             <p className="text-gray-400 text-sm">
-              Setiap hari akan memiliki 3 resep yang bisa disesuaikan (minimum 0, maksimum 3)
+              Setiap hari akan memiliki minimal 1 resep, maksimal 3 resep yang bisa disesuaikan
             </p>
             {getCurrentWeekPlan() && (
               <p className="text-blue-600 text-sm font-medium">
