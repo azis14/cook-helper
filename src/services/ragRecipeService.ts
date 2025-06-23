@@ -600,6 +600,7 @@ PENTING - ATURAN JSON YANG KETAT:
 10. Gunakan escape sequence yang benar untuk karakter khusus dalam string
 11. Tidak boleh ada kata "Tambahkan" atau komentar lainnya dalam JSON
 12. Output harus berupa JSON yang bisa langsung di-parse tanpa error
+13. Jika bahan yang diperlukan hanya secukupnya, gunakan "secukupnya" sebagai unit dan 1 untuk quantity
 `;
 
       const result = await this.geminiService.generateContent(prompt);
