@@ -958,6 +958,8 @@ PENTING: JSON harus valid tanpa komentar atau karakter khusus.
               </div>
             ))}
           </div>
+        </div>
+      )}
 
       {!weeklyPlan && !isGenerating && (
         <div className="text-center py-12">
