@@ -263,7 +263,7 @@ Pastikan:
 7. Tentukan tingkat kesulitan yang sesuai
 8. Berikan alasan relevansi yang spesifik
 9. Urutkan berdasarkan kesesuaian dengan bahan yang tersedia
-10. Jika bahan yang diperlukan hanya secukupnya, gunakan "secukupnya" sebagai unit dan null untuk quantity
+10. Jika bahan yang diperlukan hanya secukupnya, gunakan "secukupnya" sebagai unit dan 1 untuk quantity
 11. Gunakan bahasa Indonesia yang baik dan benar
 `;
 
