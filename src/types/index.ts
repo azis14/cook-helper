@@ -72,6 +72,7 @@ export interface DailyMeals {
   breakfast?: Recipe;
   lunch?: Recipe;
   dinner?: Recipe;
+  recipes?: Recipe[]; // New flexible approach - array of recipes
 }
 
 export interface ShoppingItem {

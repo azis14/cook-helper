@@ -51,17 +51,18 @@ export function useWeeklyPlans(userId: string | undefined) {
         daily_meals: plan.daily_meals?.map((meal: any) => {
           const dailyMeal: DailyMeals = {
             date: meal.date,
+            recipes: [], // Initialize recipes array
           };
 
-          // Attach full recipe objects if they exist
+          // Convert breakfast/lunch/dinner to recipes array
           if (meal.breakfast_recipe) {
-            dailyMeal.breakfast = meal.breakfast_recipe;
+            dailyMeal.recipes!.push(meal.breakfast_recipe);
           }
           if (meal.lunch_recipe) {
-            dailyMeal.lunch = meal.lunch_recipe;
+            dailyMeal.recipes!.push(meal.lunch_recipe);
           }
           if (meal.dinner_recipe) {
-            dailyMeal.dinner = meal.dinner_recipe;
+            dailyMeal.recipes!.push(meal.dinner_recipe);
           }
 
           return dailyMeal;
@@ -114,14 +115,18 @@ export function useWeeklyPlans(userId: string | undefined) {
 
       if (planError) throw planError;
 
-      // Save daily meals - only include recipe IDs for user-owned recipes
-      const dailyMealsToInsert: DailyMealInsert[] = dailyMeals.map(meal => ({
-        weekly_plan_id: planData.id,
-        date: meal.date,
-        breakfast_recipe_id: isUserRecipe(meal.breakfast) ? meal.breakfast!.id : null,
-        lunch_recipe_id: isUserRecipe(meal.lunch) ? meal.lunch!.id : null,
-        dinner_recipe_id: isUserRecipe(meal.dinner) ? meal.dinner!.id : null,
-      }));
+      // Save daily meals - convert recipes array back to breakfast/lunch/dinner format for database
+      const dailyMealsToInsert: DailyMealInsert[] = dailyMeals.map(meal => {
+        const userRecipes = (meal.recipes || []).filter(recipe => isUserRecipe(recipe));
+        
+        return {
+          weekly_plan_id: planData.id,
+          date: meal.date,
+          breakfast_recipe_id: userRecipes[0]?.id || null,
+          lunch_recipe_id: userRecipes[1]?.id || null,
+          dinner_recipe_id: userRecipes[2]?.id || null,
+        };
+      });
 
       const { error: mealsError } = await supabase
         .from('daily_meals')
@@ -175,17 +180,18 @@ export function useWeeklyPlans(userId: string | undefined) {
       const dailyMeals: DailyMeals[] = (data.daily_meals || []).map((meal: any) => {
         const dailyMeal: DailyMeals = {
           date: meal.date,
+          recipes: [],
         };
 
-        // Use the fetched recipe objects directly
+        // Convert breakfast/lunch/dinner to recipes array
         if (meal.breakfast_recipe) {
-          dailyMeal.breakfast = meal.breakfast_recipe;
+          dailyMeal.recipes!.push(meal.breakfast_recipe);
         }
         if (meal.lunch_recipe) {
-          dailyMeal.lunch = meal.lunch_recipe;
+          dailyMeal.recipes!.push(meal.lunch_recipe);
         }
         if (meal.dinner_recipe) {
-          dailyMeal.dinner = meal.dinner_recipe;
+          dailyMeal.recipes!.push(meal.dinner_recipe);
         }
 
         return dailyMeal;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, ShoppingCart, Clock, Users, Plus, Trash2, Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { Calendar, ShoppingCart, Clock, Users, Plus, Trash2, Save, CheckCircle, AlertCircle, Edit } from 'lucide-react';
 import { Recipe, WeeklyPlan, DailyMeals, ShoppingItem, Ingredient } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useWeeklyPlans } from '../hooks/useWeeklyPlans';
@@ -16,7 +16,6 @@ interface RecipeSelectionModalProps {
   onClose: () => void;
   onSelectRecipe: (recipe: Recipe) => void;
   dayName: string;
-  slotNumber: number;
   userRecipes: Recipe[];
   ingredients: Ingredient[];
 }
@@ -26,7 +25,6 @@ const RecipeSelectionModal: React.FC<RecipeSelectionModalProps> = ({
   onClose,
   onSelectRecipe,
   dayName,
-  slotNumber,
   userRecipes,
   ingredients,
 }) => {
@@ -78,7 +76,7 @@ const RecipeSelectionModal: React.FC<RecipeSelectionModalProps> = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
-              Pilih Resep untuk {dayName} - Slot {slotNumber}
+              Pilih Resep untuk {dayName}
             </h3>
             <p className="text-sm text-gray-600 mt-1">
               Pilih resep dari koleksi Anda atau temukan dari dataset komunitas
@@ -267,21 +265,13 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
   const [peopleCount, setPeopleCount] = useState(4);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<{
+  const [selectedDay, setSelectedDay] = useState<{
     dayIndex: number;
-    mealType: 'breakfast' | 'lunch' | 'dinner';
     dayName: string;
-    slotNumber: number;
   } | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-  const meals = ['breakfast', 'lunch', 'dinner'] as const;
-  const mealLabels = {
-    breakfast: 'Sarapan',
-    lunch: 'Makan Siang',
-    dinner: 'Makan Malam',
-  };
 
   // Load current week plan when component mounts or plans change
   useEffect(() => {
@@ -312,20 +302,16 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
         
         const dayMeals: DailyMeals = {
           date: date.toISOString().slice(0, 10),
+          recipes: [], // Initialize with empty recipes array
         };
         
-        // Randomly assign recipes or create simple suggestions
+        // Add 1-2 random recipes per day if available
         if (recipes.length > 0) {
-          // Ensure at least one meal per day
-          const mealTypes = ['breakfast', 'lunch', 'dinner'] as const;
-          const randomMealType = mealTypes[Math.floor(Math.random() * mealTypes.length)];
-          dayMeals[randomMealType] = recipes[Math.floor(Math.random() * recipes.length)];
+          const numRecipes = Math.floor(Math.random() * 2) + 1; // 1-2 recipes
+          const shuffledRecipes = [...recipes].sort(() => Math.random() - 0.5);
           
-          // Optionally add more meals
-          if (Math.random() > 0.5) {
-            const otherMealTypes = mealTypes.filter(type => type !== randomMealType);
-            const secondMealType = otherMealTypes[Math.floor(Math.random() * otherMealTypes.length)];
-            dayMeals[secondMealType] = recipes[Math.floor(Math.random() * recipes.length)];
+          for (let j = 0; j < Math.min(numRecipes, shuffledRecipes.length); j++) {
+            dayMeals.recipes!.push(shuffledRecipes[j]);
           }
         }
         
@@ -370,7 +356,7 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     
     // Collect all ingredients needed for the week
     (plan.daily_meals || []).forEach(day => {
-      [day.breakfast, day.lunch, day.dinner].forEach(recipe => {
+      (day.recipes || []).forEach(recipe => {
         if (recipe && recipe.recipe_ingredients) {
           recipe.recipe_ingredients.forEach(ingredient => {
             const key = ingredient.name.toLowerCase();
@@ -410,29 +396,39 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     setShoppingList(Object.values(neededIngredients));
   };
 
-  const handleAddRecipe = (dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner') => {
-    setSelectedSlot({
+  const handleAddRecipe = (dayIndex: number) => {
+    setSelectedDay({
       dayIndex,
-      mealType,
       dayName: days[dayIndex],
-      slotNumber: meals.indexOf(mealType) + 1,
     });
     setShowRecipeModal(true);
   };
 
   const handleSelectRecipe = (recipe: Recipe) => {
-    if (!selectedSlot || !currentWeekPlan) return;
+    if (!selectedDay || !currentWeekPlan) return;
 
     const updatedMeals = [...(currentWeekPlan.daily_meals || [])];
-    if (!updatedMeals[selectedSlot.dayIndex]) {
+    if (!updatedMeals[selectedDay.dayIndex]) {
       const date = new Date();
-      date.setDate(date.getDate() - date.getDay() + 1 + selectedSlot.dayIndex);
-      updatedMeals[selectedSlot.dayIndex] = {
+      date.setDate(date.getDate() - date.getDay() + 1 + selectedDay.dayIndex);
+      updatedMeals[selectedDay.dayIndex] = {
         date: date.toISOString().slice(0, 10),
+        recipes: [],
       };
     }
     
-    updatedMeals[selectedSlot.dayIndex][selectedSlot.mealType] = recipe;
+    // Add recipe to the day's recipes list
+    if (!updatedMeals[selectedDay.dayIndex].recipes) {
+      updatedMeals[selectedDay.dayIndex].recipes = [];
+    }
+    
+    // Check if we already have 3 recipes for this day
+    if (updatedMeals[selectedDay.dayIndex].recipes!.length >= 3) {
+      alert('Maksimal 3 resep per hari');
+      return;
+    }
+    
+    updatedMeals[selectedDay.dayIndex].recipes!.push(recipe);
     
     const updatedPlan = {
       ...currentWeekPlan,
@@ -443,15 +439,15 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     generateShoppingList(updatedPlan);
     setHasUnsavedChanges(true);
     setShowRecipeModal(false);
-    setSelectedSlot(null);
+    setSelectedDay(null);
   };
 
-  const handleRemoveRecipe = (dayIndex: number, mealType: 'breakfast' | 'lunch' | 'dinner') => {
+  const handleRemoveRecipe = (dayIndex: number, recipeIndex: number) => {
     if (!currentWeekPlan) return;
 
     const updatedMeals = [...(currentWeekPlan.daily_meals || [])];
-    if (updatedMeals[dayIndex]) {
-      delete updatedMeals[dayIndex][mealType];
+    if (updatedMeals[dayIndex] && updatedMeals[dayIndex].recipes) {
+      updatedMeals[dayIndex].recipes!.splice(recipeIndex, 1);
     }
     
     const updatedPlan = {
@@ -462,6 +458,16 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
     setCurrentWeekPlan(updatedPlan);
     generateShoppingList(updatedPlan);
     setHasUnsavedChanges(true);
+  };
+
+  const handleChangeRecipe = (dayIndex: number, recipeIndex: number) => {
+    // Store which recipe we're replacing
+    setSelectedDay({
+      dayIndex,
+      dayName: days[dayIndex],
+      replacingIndex: recipeIndex,
+    } as any);
+    setShowRecipeModal(true);
   };
 
   const unitTranslations: Record<string, string> = {
@@ -578,44 +584,63 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
                 <h3 className="font-semibold text-gray-900 mb-3 text-center">
                   {days[dayIndex]}
                 </h3>
-                <div className="space-y-3">
-                  {meals.map((mealType) => (
-                    <div key={mealType} className="border border-gray-200 rounded-lg p-2">
-                      <div className="text-xs font-medium text-gray-600 mb-1">
-                        {mealLabels[mealType]}
-                      </div>
-                      {day[mealType] ? (
-                        <div className="text-sm">
-                          <div className="font-medium text-gray-900 mb-1">
-                            {day[mealType]!.name}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
-                            <Clock size={12} />
-                            <span>
-                              {day[mealType]!.prep_time + day[mealType]!.cook_time} menit
-                            </span>
-                            <Users size={12} />
-                            <span>{day[mealType]!.servings} porsi</span>
-                          </div>
+                <div className="space-y-2">
+                  {/* Display existing recipes */}
+                  {(day.recipes || []).map((recipe, recipeIndex) => (
+                    <div key={recipeIndex} className="border border-gray-200 rounded-lg p-2">
+                      <div className="text-sm">
+                        <div className="font-medium text-gray-900 mb-1">
+                          {recipe.name}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                          <Clock size={12} />
+                          <span>{recipe.prep_time + recipe.cook_time} menit</span>
+                          <Users size={12} />
+                          <span>{recipe.servings} porsi</span>
+                        </div>
+                        <div className="flex items-center gap-1">
                           <button
-                            onClick={() => handleRemoveRecipe(dayIndex, mealType)}
-                            className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 mt-1"
+                            onClick={() => handleChangeRecipe(dayIndex, recipeIndex)}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                          >
+                            <Edit size={12} />
+                            Ubah
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => handleRemoveRecipe(dayIndex, recipeIndex)}
+                            className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800"
                           >
                             <Trash2 size={12} />
                             Hapus
                           </button>
                         </div>
-                      ) : (
-                        <button
-                          onClick={() => handleAddRecipe(dayIndex, mealType)}
-                          className="w-full text-xs text-blue-600 hover:text-blue-800 border border-dashed border-blue-300 rounded p-2 hover:bg-blue-50 transition-colors"
-                        >
-                          <Plus size={12} className="mx-auto mb-1" />
-                          Tambah Resep
-                        </button>
-                      )}
+                      </div>
                     </div>
                   ))}
+                  
+                  {/* Add recipe button - only show if less than 3 recipes */}
+                  {(!day.recipes || day.recipes.length < 3) && (
+                    <button
+                      onClick={() => handleAddRecipe(dayIndex)}
+                      className="w-full text-xs text-blue-600 hover:text-blue-800 border border-dashed border-blue-300 rounded p-3 hover:bg-blue-50 transition-colors"
+                    >
+                      <Plus size={16} className="mx-auto mb-1" />
+                      Tambah Resep
+                      {day.recipes && day.recipes.length > 0 && (
+                        <div className="text-gray-500 mt-1">
+                          ({day.recipes.length}/3)
+                        </div>
+                      )}
+                    </button>
+                  )}
+                  
+                  {/* Show count if at max */}
+                  {day.recipes && day.recipes.length >= 3 && (
+                    <div className="text-center text-xs text-gray-500 py-2">
+                      Maksimal 3 resep per hari
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -676,11 +701,31 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
         isOpen={showRecipeModal}
         onClose={() => {
           setShowRecipeModal(false);
-          setSelectedSlot(null);
+          setSelectedDay(null);
         }}
-        onSelectRecipe={handleSelectRecipe}
-        dayName={selectedSlot?.dayName || ''}
-        slotNumber={selectedSlot?.slotNumber || 0}
+        onSelectRecipe={(recipe) => {
+          if (selectedDay && 'replacingIndex' in selectedDay) {
+            // Replace existing recipe
+            if (!currentWeekPlan) return;
+            const updatedMeals = [...(currentWeekPlan.daily_meals || [])];
+            if (updatedMeals[selectedDay.dayIndex] && updatedMeals[selectedDay.dayIndex].recipes) {
+              updatedMeals[selectedDay.dayIndex].recipes![selectedDay.replacingIndex] = recipe;
+              const updatedPlan = {
+                ...currentWeekPlan,
+                daily_meals: updatedMeals,
+              };
+              setCurrentWeekPlan(updatedPlan);
+              generateShoppingList(updatedPlan);
+              setHasUnsavedChanges(true);
+            }
+          } else {
+            // Add new recipe
+            handleSelectRecipe(recipe);
+          }
+          setShowRecipeModal(false);
+          setSelectedDay(null);
+        }}
+        dayName={selectedDay?.dayName || ''}
         userRecipes={recipes}
         ingredients={ingredients}
       />
