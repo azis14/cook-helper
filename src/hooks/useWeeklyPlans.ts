@@ -14,16 +14,30 @@ export function useWeeklyPlans(userId: string | undefined) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchWeeklyPlans = async () => {
-    if (!userId) return;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
+      
+      // Fetch weekly plans with daily meals and recipe details
       const { data, error } = await supabase
         .from('weekly_plans')
         .select(`
           *,
           daily_meals (
-            *
+            *,
+            breakfast_recipe:recipes!breakfast_recipe_id (*,
+              recipe_ingredients (*)
+            ),
+            lunch_recipe:recipes!lunch_recipe_id (*,
+              recipe_ingredients (*)
+            ),
+            dinner_recipe:recipes!dinner_recipe_id (*,
+              recipe_ingredients (*)
+            )
           )
         `)
         .eq('user_id', userId)
@@ -34,16 +48,30 @@ export function useWeeklyPlans(userId: string | undefined) {
       // Transform the data to match our WeeklyPlan type
       const transformedPlans: WeeklyPlan[] = (data || []).map(plan => ({
         ...plan,
-        daily_meals: plan.daily_meals?.map((meal: any) => ({
-          date: meal.date,
-          breakfast_recipe_id: meal.breakfast_recipe_id,
-          lunch_recipe_id: meal.lunch_recipe_id,
-          dinner_recipe_id: meal.dinner_recipe_id,
-        })) || []
+        daily_meals: plan.daily_meals?.map((meal: any) => {
+          const dailyMeal: DailyMeals = {
+            date: meal.date,
+          };
+
+          // Attach full recipe objects if they exist
+          if (meal.breakfast_recipe) {
+            dailyMeal.breakfast = meal.breakfast_recipe;
+          }
+          if (meal.lunch_recipe) {
+            dailyMeal.lunch = meal.lunch_recipe;
+          }
+          if (meal.dinner_recipe) {
+            dailyMeal.dinner = meal.dinner_recipe;
+          }
+
+          return dailyMeal;
+        }) || []
       }));
 
       setWeeklyPlans(transformedPlans);
+      console.log('Loaded weekly plans:', transformedPlans);
     } catch (err) {
+      console.error('Error fetching weekly plans:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
@@ -109,8 +137,10 @@ export function useWeeklyPlans(userId: string | undefined) {
       // Update local state
       setWeeklyPlans(prev => [savedPlan, ...prev.filter(p => p.week_start !== weekStart)]);
       
+      console.log('Weekly plan saved successfully:', savedPlan);
       return savedPlan;
     } catch (err) {
+      console.error('Error saving weekly plan:', err);
       setError(err instanceof Error ? err.message : 'Failed to save weekly plan');
       throw err;
     }
@@ -123,7 +153,16 @@ export function useWeeklyPlans(userId: string | undefined) {
         .select(`
           *,
           daily_meals (
-            *
+            *,
+            breakfast_recipe:recipes!breakfast_recipe_id (*,
+              recipe_ingredients (*)
+            ),
+            lunch_recipe:recipes!lunch_recipe_id (*,
+              recipe_ingredients (*)
+            ),
+            dinner_recipe:recipes!dinner_recipe_id (*,
+              recipe_ingredients (*)
+            )
           )
         `)
         .eq('id', planId)
@@ -138,15 +177,15 @@ export function useWeeklyPlans(userId: string | undefined) {
           date: meal.date,
         };
 
-        // Find and attach actual recipe objects
-        if (meal.breakfast_recipe_id) {
-          dailyMeal.breakfast = recipes.find(r => r.id === meal.breakfast_recipe_id) || null;
+        // Use the fetched recipe objects directly
+        if (meal.breakfast_recipe) {
+          dailyMeal.breakfast = meal.breakfast_recipe;
         }
-        if (meal.lunch_recipe_id) {
-          dailyMeal.lunch = recipes.find(r => r.id === meal.lunch_recipe_id) || null;
+        if (meal.lunch_recipe) {
+          dailyMeal.lunch = meal.lunch_recipe;
         }
-        if (meal.dinner_recipe_id) {
-          dailyMeal.dinner = recipes.find(r => r.id === meal.dinner_recipe_id) || null;
+        if (meal.dinner_recipe) {
+          dailyMeal.dinner = meal.dinner_recipe;
         }
 
         return dailyMeal;
@@ -157,6 +196,7 @@ export function useWeeklyPlans(userId: string | undefined) {
         daily_meals: dailyMeals,
       };
     } catch (err) {
+      console.error('Error loading weekly plan:', err);
       setError(err instanceof Error ? err.message : 'Failed to load weekly plan');
       throw err;
     }
@@ -184,7 +224,9 @@ export function useWeeklyPlans(userId: string | undefined) {
     monday.setDate(today.getDate() - today.getDay() + 1); // Get Monday of current week
     const weekStart = monday.toISOString().slice(0, 10);
 
-    return weeklyPlans.find(plan => plan.week_start === weekStart) || null;
+    const currentPlan = weeklyPlans.find(plan => plan.week_start === weekStart) || null;
+    console.log('Current week plan:', currentPlan);
+    return currentPlan;
   };
 
   useEffect(() => {

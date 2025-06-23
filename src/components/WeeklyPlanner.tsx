@@ -134,19 +134,30 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
 
   // Load current week plan on component mount
   useEffect(() => {
-    if (!plansLoading && weeklyPlans.length > 0) {
+    if (!plansLoading && user?.id) {
       const currentPlan = getCurrentWeekPlan();
-      if (currentPlan) {
-        // Convert old format to new format
+      console.log('Loading current week plan:', currentPlan);
+      
+      if (currentPlan && currentPlan.daily_meals) {
+        // Convert saved plan format to new format
         const dailyRecipes: DailyRecipes[] = [];
+        
+        // Create 7 days starting from Monday of current week
+        const today = new Date();
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - today.getDay() + 1);
+        
         for (let i = 0; i < 7; i++) {
-          const date = new Date();
-          date.setDate(date.getDate() + i);
+          const date = new Date(monday);
+          date.setDate(monday.getDate() + i);
+          const dateString = date.toISOString().slice(0, 10);
           
-          const dayMeal = currentPlan.daily_meals?.find(meal => meal.date === date.toISOString().slice(0, 10));
+          // Find corresponding daily meal from saved plan
+          const dayMeal = currentPlan.daily_meals.find(meal => meal.date === dateString);
           const recipes: (Recipe | null)[] = [];
           
           if (dayMeal) {
+            // Add recipes in order: breakfast, lunch, dinner
             if (dayMeal.breakfast) recipes.push(dayMeal.breakfast);
             if (dayMeal.lunch) recipes.push(dayMeal.lunch);
             if (dayMeal.dinner) recipes.push(dayMeal.dinner);
@@ -158,22 +169,27 @@ export const WeeklyPlanner: React.FC<WeeklyPlannerProps> = ({
           }
           
           dailyRecipes.push({
-            date: date.toISOString().slice(0, 10),
+            date: dateString,
             recipes: recipes.slice(0, 3) // Ensure max 3
           });
         }
         
-        setWeeklyPlan({
+        const convertedPlan = {
           id: currentPlan.id,
           week_start: currentPlan.week_start,
           user_id: currentPlan.user_id,
           daily_recipes: dailyRecipes
-        });
+        };
+        
+        console.log('Converted plan to new format:', convertedPlan);
+        setWeeklyPlan(convertedPlan);
         setPlanSaved(true);
         generateShoppingList({ daily_recipes: dailyRecipes }, peopleCount);
+      } else {
+        console.log('No current week plan found');
       }
     }
-  }, [plansLoading, weeklyPlans]);
+  }, [plansLoading, weeklyPlans, user?.id]);
 
   // Helper function to check ingredient similarity
   const isSimilarIngredient = (ingredient1: string, ingredient2: string): boolean => {
