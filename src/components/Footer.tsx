@@ -35,11 +35,11 @@ export const Footer: React.FC = () => {
             </span>
             <a
               href="mailto:azis@cookhelper.xyz"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium text-sm rounded-lg hover:from-blue-600 hover:to-blue-700 transform hover:scale-105 transition-all duration-200 shadow-md hover:shadow-lg"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium text-sm rounded-lg hover:from-blue-600 hover:to-blue-700 transform hover:scale-105 transition-all duration-200 shadow-md hover:shadow-lg cursor-pointer"
+              title="Kirim email ke azis@cookhelper.xyz"
             >
               <Mail size={16} />
               azis@cookhelper.xyz
-              <ExternalLink size={14} />
             </a>
           </div>
 
