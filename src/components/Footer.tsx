@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Coffee, ExternalLink } from 'lucide-react';
+import { Heart, Coffee, ExternalLink, Mail } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
@@ -24,6 +24,21 @@ export const Footer: React.FC = () => {
               className="font-semibold text-orange-600 hover:text-orange-800 transition-colors duration-200 flex items-center gap-1"
             >
               azis14
+              <ExternalLink size={14} />
+            </a>
+          </div>
+
+          {/* Contact Section */}
+          <div className="flex flex-col items-center gap-3">
+            <span className="text-sm text-gray-600 font-medium">
+              Butuh bantuan atau ada pertanyaan?
+            </span>
+            <a
+              href="mailto:azis@cookhelper.xyz"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium text-sm rounded-lg hover:from-blue-600 hover:to-blue-700 transform hover:scale-105 transition-all duration-200 shadow-md hover:shadow-lg"
+            >
+              <Mail size={16} />
+              azis@cookhelper.xyz
               <ExternalLink size={14} />
             </a>
           </div>
