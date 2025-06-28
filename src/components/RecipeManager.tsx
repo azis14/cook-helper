@@ -52,7 +52,7 @@ export const RecipeManager: React.FC = () => {
     clove: 'siung',
   };
 
-  // Filter recipes based on search query
+  // Filter recipes based on search query - ensuring no duplicates
   const filteredRecipes = useMemo(() => {
     if (!searchQuery.trim()) {
       return recipes;
@@ -60,43 +60,61 @@ export const RecipeManager: React.FC = () => {
 
     const query = searchQuery.toLowerCase().trim();
     
-    return recipes.filter(recipe => {
+    // Use a Set to track recipe IDs and prevent duplicates
+    const matchedRecipeIds = new Set<string>();
+    const matchedRecipes: Recipe[] = [];
+    
+    recipes.forEach(recipe => {
+      // Skip if already matched (prevents duplicates)
+      if (matchedRecipeIds.has(recipe.id)) {
+        return;
+      }
+
+      let isMatch = false;
+
       // Search in recipe name
       if (recipe.name.toLowerCase().includes(query)) {
-        return true;
+        isMatch = true;
       }
 
-      // Search in recipe description
-      if (recipe.description.toLowerCase().includes(query)) {
-        return true;
+      // Search in recipe description (only if not already matched)
+      if (!isMatch && recipe.description.toLowerCase().includes(query)) {
+        isMatch = true;
       }
 
-      // Search in recipe tags
-      if (recipe.tags.some(tag => tag.toLowerCase().includes(query))) {
-        return true;
+      // Search in recipe tags (only if not already matched)
+      if (!isMatch && recipe.tags.some(tag => tag.toLowerCase().includes(query))) {
+        isMatch = true;
       }
 
-      // Search in recipe ingredients
-      if (recipe.recipe_ingredients.some(ingredient => 
+      // Search in recipe ingredients (only if not already matched)
+      if (!isMatch && recipe.recipe_ingredients.some(ingredient => 
         ingredient.name.toLowerCase().includes(query)
       )) {
-        return true;
+        isMatch = true;
       }
 
-      // Search in instructions
-      if (recipe.instructions.some(instruction => 
+      // Search in instructions (only if not already matched)
+      if (!isMatch && recipe.instructions.some(instruction => 
         instruction.toLowerCase().includes(query)
       )) {
-        return true;
+        isMatch = true;
       }
 
-      return false;
+      // If any criteria matched, add to results
+      if (isMatch) {
+        matchedRecipeIds.add(recipe.id);
+        matchedRecipes.push(recipe);
+      }
     });
+
+    return matchedRecipes;
   }, [recipes, searchQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Convert empty string to null for expiry_date
       const recipeData = {
         name: formData.name,
         description: formData.description,
@@ -277,7 +295,7 @@ export const RecipeManager: React.FC = () => {
         </button>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Bar - Only show when user has recipes */}
       {recipes.length > 0 && (
         <div className="bg-white p-4 rounded-lg shadow-md border border-gray-100">
           <div className="flex items-center gap-2 mb-2">
@@ -290,7 +308,7 @@ export const RecipeManager: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari berdasarkan nama resep, bahan, atau instruksi..."
+              placeholder="Cari berdasarkan nama resep, bahan, deskripsi, instruksi, atau tag..."
               className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
             {searchQuery && (
