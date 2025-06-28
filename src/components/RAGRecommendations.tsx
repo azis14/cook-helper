@@ -234,25 +234,7 @@ export const RAGRecommendations: React.FC<RAGRecommendationsProps> = ({
             <Brain className="text-purple-600" size={28} />
             Asisten AI
           </h2>
-          <p className="text-gray-600 mt-1">
-            Rekomendasi resep menggunakan AI semantik dan embedding dengan pemrosesan AI
-          </p>
         </div>
-      </div>
-
-      {/* RAG Status & Info */}
-      <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
-        <div className="flex items-center gap-3 mb-2">
-          <Brain className="text-purple-600" size={20} />
-          <h3 className="font-semibold text-gray-900">Sistem RAG dengan AI Processing</h3>
-        </div>
-        <p className="text-sm text-gray-700 mb-2">
-          Menggunakan semantic embeddings untuk menemukan resep yang paling relevan dengan bahan Anda. 
-          Hasil pencarian diproses dengan AI untuk memastikan format dan kualitas yang optimal.
-        </p>
-        <p className="text-xs text-gray-600">
-          💡 Embeddings diperbarui secara otomatis di background menggunakan cron job untuk performa optimal.
-        </p>
       </div>
 
       {/* Search and Filters */}
