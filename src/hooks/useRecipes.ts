@@ -29,7 +29,16 @@ export function useRecipes(userId: string | undefined) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setRecipes(data || []);
+      
+      // Ensure no duplicates by using a Map to deduplicate by ID
+      const uniqueRecipes = new Map();
+      (data || []).forEach(recipe => {
+        if (!uniqueRecipes.has(recipe.id)) {
+          uniqueRecipes.set(recipe.id, recipe);
+        }
+      });
+      
+      setRecipes(Array.from(uniqueRecipes.values()));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -79,7 +88,12 @@ export function useRecipes(userId: string | undefined) {
 
       if (fetchError) throw fetchError;
 
-      setRecipes(prev => [completeRecipe, ...prev]);
+      // Add to state, ensuring no duplicates
+      setRecipes(prev => {
+        const filtered = prev.filter(r => r.id !== completeRecipe.id);
+        return [completeRecipe, ...filtered];
+      });
+      
       return completeRecipe;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add recipe');
@@ -138,9 +152,11 @@ export function useRecipes(userId: string | undefined) {
 
       if (fetchError) throw fetchError;
 
+      // Update state, ensuring no duplicates
       setRecipes(prev => 
         prev.map(recipe => recipe.id === id ? completeRecipe : recipe)
       );
+      
       return completeRecipe;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update recipe');
@@ -156,6 +172,8 @@ export function useRecipes(userId: string | undefined) {
         .eq('id', id);
 
       if (error) throw error;
+      
+      // Remove from state
       setRecipes(prev => prev.filter(recipe => recipe.id !== id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete recipe');

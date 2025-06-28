@@ -114,7 +114,6 @@ export const RecipeManager: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Convert empty string to null for expiry_date
       const recipeData = {
         name: formData.name,
         description: formData.description,
@@ -153,6 +152,10 @@ export const RecipeManager: React.FC = () => {
       difficulty: 'easy',
       tags: [],
     });
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
   };
 
   const handleEdit = (recipe: any) => {
@@ -217,10 +220,6 @@ export const RecipeManager: React.FC = () => {
   const handleCardClick = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setShowDetailModal(true);
-  };
-
-  const clearSearch = () => {
-    setSearchQuery('');
   };
 
   const addInstruction = () => {
