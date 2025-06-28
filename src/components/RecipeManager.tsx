@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Edit, Clock, Users, ChefHat } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Trash2, Edit, Clock, Users, ChefHat, Search, X } from 'lucide-react';
 import { useRecipes } from '../hooks/useRecipes';
 import { useAuth } from '../hooks/useAuth';
 import { RecipeDetailModal } from './RecipeDetailModal';
@@ -13,6 +13,7 @@ export const RecipeManager: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     recipeId: string | null;
@@ -50,6 +51,48 @@ export const RecipeManager: React.FC = () => {
     piece: 'buah',
     clove: 'siung',
   };
+
+  // Filter recipes based on search query
+  const filteredRecipes = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return recipes;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    
+    return recipes.filter(recipe => {
+      // Search in recipe name
+      if (recipe.name.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in recipe description
+      if (recipe.description.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in recipe tags
+      if (recipe.tags.some(tag => tag.toLowerCase().includes(query))) {
+        return true;
+      }
+
+      // Search in recipe ingredients
+      if (recipe.recipe_ingredients.some(ingredient => 
+        ingredient.name.toLowerCase().includes(query)
+      )) {
+        return true;
+      }
+
+      // Search in instructions
+      if (recipe.instructions.some(instruction => 
+        instruction.toLowerCase().includes(query)
+      )) {
+        return true;
+      }
+
+      return false;
+    });
+  }, [recipes, searchQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +201,10 @@ export const RecipeManager: React.FC = () => {
     setShowDetailModal(true);
   };
 
+  const clearSearch = () => {
+    setSearchQuery('');
+  };
+
   const addInstruction = () => {
     setFormData({
       ...formData,
@@ -229,6 +276,43 @@ export const RecipeManager: React.FC = () => {
           Tambah Resep
         </button>
       </div>
+
+      {/* Search Bar */}
+      {recipes.length > 0 && (
+        <div className="bg-white p-4 rounded-lg shadow-md border border-gray-100">
+          <div className="flex items-center gap-2 mb-2">
+            <Search size={20} className="text-gray-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Cari Resep</h3>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari berdasarkan nama resep, bahan, atau instruksi..."
+              className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                title="Hapus pencarian"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <div className="mt-2 text-sm text-gray-600">
+              Menampilkan {filteredRecipes.length} dari {recipes.length} resep
+              {filteredRecipes.length === 0 && (
+                <span className="text-orange-600 ml-1">- Tidak ada resep yang cocok</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {showForm && (
         <div className="bg-white p-6 rounded-lg shadow-md border border-green-100 max-h-96 overflow-y-auto">
@@ -434,9 +518,20 @@ export const RecipeManager: React.FC = () => {
           <ChefHat size={48} className="mx-auto text-gray-400 mb-4" />
           <p className="text-gray-500">Belum ada resep tersimpan. Buat resep pertama Anda!</p>
         </div>
+      ) : filteredRecipes.length === 0 && searchQuery ? (
+        <div className="text-center py-12">
+          <Search size={48} className="mx-auto text-gray-400 mb-4" />
+          <p className="text-gray-500 mb-2">Tidak ada resep yang cocok dengan pencarian "{searchQuery}"</p>
+          <button
+            onClick={clearSearch}
+            className="text-green-600 hover:text-green-800 text-sm underline"
+          >
+            Hapus pencarian untuk melihat semua resep
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {recipes.map((recipe) => (
+          {filteredRecipes.map((recipe) => (
             <div
               key={recipe.id}
               className="bg-white rounded-lg shadow-md border border-green-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
