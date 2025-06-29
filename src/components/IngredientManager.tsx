@@ -3,12 +3,16 @@ import { Plus, Trash2, Edit } from 'lucide-react';
 import { useIngredients } from '../hooks/useIngredients';
 import { useAuth } from '../hooks/useAuth';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
+import { IngredientDetailModal } from './IngredientDetailModal';
+import { Ingredient } from '../types';
 
 export const IngredientManager: React.FC = () => {
   const { user } = useAuth();
   const { ingredients, loading, error, addIngredient, updateIngredient, deleteIngredient } = useIngredients(user?.id);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     ingredientId: string | null;
@@ -125,6 +129,11 @@ export const IngredientManager: React.FC = () => {
       ingredientName: '',
       isDeleting: false,
     });
+  };
+
+  const handleCardClick = (ingredient: Ingredient) => {
+    setSelectedIngredient(ingredient);
+    setShowDetailModal(true);
   };
 
   const groupedIngredients = ingredients.reduce((acc, ingredient) => {
@@ -281,7 +290,8 @@ export const IngredientManager: React.FC = () => {
                 {categoryIngredients.map((ingredient) => (
                   <div
                     key={ingredient.id}
-                    className="p-3 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                    className="p-3 border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer hover:border-orange-300"
+                    onClick={() => handleCardClick(ingredient)}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-medium text-gray-900">
@@ -289,14 +299,20 @@ export const IngredientManager: React.FC = () => {
                       </h4>
                       <div className="flex gap-1">
                         <button
-                          onClick={() => handleEdit(ingredient)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(ingredient);
+                          }}
                           className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                           title="Edit bahan"
                         >
                           <Edit size={14} />
                         </button>
                         <button
-                          onClick={() => handleDeleteClick(ingredient)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(ingredient);
+                          }}
                           className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
                           title="Hapus bahan"
                         >
@@ -312,6 +328,11 @@ export const IngredientManager: React.FC = () => {
                         Kadaluarsa: {new Date(ingredient.expiry_date).toLocaleDateString('id-ID')}
                       </p>
                     )}
+                    
+                    {/* Click hint */}
+                    <div className="mt-2 text-xs text-gray-400 text-center border-t border-gray-100 pt-2">
+                      Klik untuk melihat detail lengkap
+                    </div>
                   </div>
                 ))}
               </div>
@@ -319,6 +340,16 @@ export const IngredientManager: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Ingredient Detail Modal */}
+      <IngredientDetailModal
+        ingredient={selectedIngredient}
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedIngredient(null);
+        }}
+      />
 
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
