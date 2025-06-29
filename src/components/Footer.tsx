@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Coffee, ExternalLink, Mail } from 'lucide-react';
+import { Heart, Coffee, ExternalLink, Mail, Zap } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
@@ -61,15 +61,29 @@ export const Footer: React.FC = () => {
           </div>
         </div>
 
-        {/* Additional Info */}
+        {/* Built with Bolt.new Badge */}
         <div className="mt-6 pt-6 border-t border-orange-200">
-          <div className="text-center">
-            <p className="text-xs text-gray-500">
-              Cook Helper - Aplikasi asisten memasak pintar untuk keluarga Indonesia
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Dibuat dengan React, TypeScript, Supabase, dan AI
-            </p>
+          <div className="flex flex-col items-center gap-4">
+            <a
+              href="https://bolt.new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-medium text-sm rounded-lg hover:from-purple-700 hover:to-blue-700 transform hover:scale-105 transition-all duration-200 shadow-md hover:shadow-lg group"
+              title="Built with Bolt.new - AI-powered full-stack development"
+            >
+              <Zap size={16} className="group-hover:animate-pulse" />
+              <span>Built with Bolt.new</span>
+              <ExternalLink size={14} className="group-hover:translate-x-0.5 transition-transform" />
+            </a>
+            
+            <div className="text-center">
+              <p className="text-xs text-gray-500">
+                Cook Helper - Aplikasi asisten memasak pintar untuk keluarga Indonesia
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Dibuat dengan React, TypeScript, Supabase, dan AI
+              </p>
+            </div>
           </div>
         </div>
       </div>
