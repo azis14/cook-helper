@@ -4,15 +4,17 @@ import { useIngredients } from '../hooks/useIngredients';
 import { useAuth } from '../hooks/useAuth';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { IngredientDetailModal } from './IngredientDetailModal';
+import { IngredientEditModal } from './IngredientEditModal';
 import { Ingredient } from '../types';
 
 export const IngredientManager: React.FC = () => {
   const { user } = useAuth();
   const { ingredients, loading, error, addIngredient, updateIngredient, deleteIngredient } = useIngredients(user?.id);
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     ingredientId: string | null;
@@ -61,12 +63,7 @@ export const IngredientManager: React.FC = () => {
         expiry_date: formData.expiry_date === '' ? null : formData.expiry_date,
       };
 
-      if (editingId) {
-        await updateIngredient(editingId, dataToSubmit);
-        setEditingId(null);
-      } else {
-        await addIngredient(dataToSubmit);
-      }
+      await addIngredient(dataToSubmit);
       setFormData({
         name: '',
         quantity: 1,
@@ -80,16 +77,33 @@ export const IngredientManager: React.FC = () => {
     }
   };
 
-  const handleEdit = (ingredient: any) => {
-    setFormData({
-      name: ingredient.name,
-      quantity: ingredient.quantity,
-      unit: ingredient.unit,
-      category: ingredient.category,
-      expiry_date: ingredient.expiry_date || '',
-    });
-    setEditingId(ingredient.id);
-    setShowForm(true);
+  const handleEdit = (ingredient: Ingredient) => {
+    setEditingIngredient(ingredient);
+    setShowEditModal(true);
+  };
+
+  const handleEditFromModal = async (id: string, updates: Partial<Ingredient>) => {
+    try {
+      await updateIngredient(id, updates);
+      // Update the selected ingredient to reflect changes in the modal
+      if (selectedIngredient && selectedIngredient.id === id) {
+        setSelectedIngredient({ ...selectedIngredient, ...updates });
+      }
+    } catch (err) {
+      console.error('Error updating ingredient from modal:', err);
+      throw err; // Re-throw to let the modal handle the error
+    }
+  };
+
+  const handleEditSave = async (id: string, updates: Partial<Ingredient>) => {
+    try {
+      await updateIngredient(id, updates);
+      setShowEditModal(false);
+      setEditingIngredient(null);
+    } catch (err) {
+      console.error('Error updating ingredient:', err);
+      throw err; // Re-throw to let the modal handle the error
+    }
   };
 
   const handleDeleteClick = (ingredient: any) => {
@@ -136,19 +150,6 @@ export const IngredientManager: React.FC = () => {
     setShowDetailModal(true);
   };
 
-  const handleEditFromModal = async (id: string, updates: Partial<Ingredient>) => {
-    try {
-      await updateIngredient(id, updates);
-      // Update the selected ingredient to reflect changes in the modal
-      if (selectedIngredient && selectedIngredient.id === id) {
-        setSelectedIngredient({ ...selectedIngredient, ...updates });
-      }
-    } catch (err) {
-      console.error('Error updating ingredient from modal:', err);
-      throw err; // Re-throw to let the modal handle the error
-    }
-  };
-
   const groupedIngredients = ingredients.reduce((acc, ingredient) => {
     if (!acc[ingredient.category]) {
       acc[ingredient.category] = [];
@@ -189,7 +190,7 @@ export const IngredientManager: React.FC = () => {
       {showForm && (
         <div className="bg-white p-6 rounded-lg shadow-md border border-orange-100">
           <h3 className="text-lg font-semibold mb-4">
-            {editingId ? 'Edit' : 'Tambah'} Bahan
+            Tambah Bahan
           </h3>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
@@ -270,7 +271,6 @@ export const IngredientManager: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setShowForm(false);
-                  setEditingId(null);
                   setFormData({
                     name: '',
                     quantity: 1,
@@ -363,6 +363,17 @@ export const IngredientManager: React.FC = () => {
           setSelectedIngredient(null);
         }}
         onEdit={handleEditFromModal}
+      />
+
+      {/* Ingredient Edit Modal (for list view edit) */}
+      <IngredientEditModal
+        ingredient={editingIngredient}
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingIngredient(null);
+        }}
+        onSave={handleEditSave}
       />
 
       {/* Delete Confirmation Modal */}
