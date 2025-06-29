@@ -136,6 +136,19 @@ export const IngredientManager: React.FC = () => {
     setShowDetailModal(true);
   };
 
+  const handleEditFromModal = async (id: string, updates: Partial<Ingredient>) => {
+    try {
+      await updateIngredient(id, updates);
+      // Update the selected ingredient to reflect changes in the modal
+      if (selectedIngredient && selectedIngredient.id === id) {
+        setSelectedIngredient({ ...selectedIngredient, ...updates });
+      }
+    } catch (err) {
+      console.error('Error updating ingredient from modal:', err);
+      throw err; // Re-throw to let the modal handle the error
+    }
+  };
+
   const groupedIngredients = ingredients.reduce((acc, ingredient) => {
     if (!acc[ingredient.category]) {
       acc[ingredient.category] = [];
@@ -349,6 +362,7 @@ export const IngredientManager: React.FC = () => {
           setShowDetailModal(false);
           setSelectedIngredient(null);
         }}
+        onEdit={handleEditFromModal}
       />
 
       {/* Delete Confirmation Modal */}
