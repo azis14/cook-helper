@@ -82,22 +82,15 @@ export const IngredientManager: React.FC = () => {
     setShowEditModal(true);
   };
 
-  const handleEditFromModal = async (id: string, updates: Partial<Ingredient>) => {
-    try {
-      await updateIngredient(id, updates);
-      // Update the selected ingredient to reflect changes in the modal
-      if (selectedIngredient && selectedIngredient.id === id) {
-        setSelectedIngredient({ ...selectedIngredient, ...updates });
-      }
-    } catch (err) {
-      console.error('Error updating ingredient from modal:', err);
-      throw err; // Re-throw to let the modal handle the error
-    }
-  };
-
   const handleEditSave = async (id: string, updates: Partial<Ingredient>) => {
     try {
       await updateIngredient(id, updates);
+      
+      // Update the selected ingredient if it's currently being viewed in detail modal
+      if (selectedIngredient && selectedIngredient.id === id) {
+        setSelectedIngredient({ ...selectedIngredient, ...updates });
+      }
+      
       setShowEditModal(false);
       setEditingIngredient(null);
     } catch (err) {
@@ -362,10 +355,15 @@ export const IngredientManager: React.FC = () => {
           setShowDetailModal(false);
           setSelectedIngredient(null);
         }}
-        onEdit={handleEditFromModal}
+        onEdit={(id, updates) => {
+          // Close detail modal and open edit modal
+          setShowDetailModal(false);
+          setEditingIngredient(selectedIngredient);
+          setShowEditModal(true);
+        }}
       />
 
-      {/* Ingredient Edit Modal (for list view edit) */}
+      {/* Shared Ingredient Edit Modal */}
       <IngredientEditModal
         ingredient={editingIngredient}
         isOpen={showEditModal}

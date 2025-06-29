@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { X, Package, Calendar, Tag, Scale, AlertTriangle, CheckCircle, Clock, Edit, Save } from 'lucide-react';
+import React from 'react';
+import { X, Package, Calendar, Tag, Scale, AlertTriangle, CheckCircle, Clock, Edit } from 'lucide-react';
 import { Ingredient } from '../types';
 
 interface IngredientDetailModalProps {
   ingredient: Ingredient | null;
   isOpen: boolean;
   onClose: () => void;
-  onEdit?: (id: string, updates: Partial<Ingredient>) => Promise<void>;
+  onEdit?: (id: string, updates: Partial<Ingredient>) => void;
 }
 
 export const IngredientDetailModal: React.FC<IngredientDetailModalProps> = ({
@@ -15,16 +15,6 @@ export const IngredientDetailModal: React.FC<IngredientDetailModalProps> = ({
   onClose,
   onEdit,
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [editData, setEditData] = useState({
-    name: '',
-    quantity: 0,
-    unit: '',
-    category: '',
-    expiry_date: '',
-  });
-
   if (!isOpen || !ingredient) return null;
 
   const categoryTranslations: Record<string, string> = {
@@ -52,47 +42,10 @@ export const IngredientDetailModal: React.FC<IngredientDetailModalProps> = ({
     fruits: 'bg-orange-100 text-orange-800 border-orange-200',
   };
 
-  const categories = ['vegetables', 'meat', 'seafood', 'dairy', 'fruits'];
-  const units = ['kg', 'gram', 'liter', 'ml', 'piece', 'clove'];
-
   const handleEditClick = () => {
-    setEditData({
-      name: ingredient.name,
-      quantity: ingredient.quantity,
-      unit: ingredient.unit,
-      category: ingredient.category,
-      expiry_date: ingredient.expiry_date || '',
-    });
-    setIsEditing(true);
-  };
-
-  const handleSave = async () => {
-    if (!onEdit) return;
-
-    setIsSaving(true);
-    try {
-      const updates = {
-        ...editData,
-        expiry_date: editData.expiry_date === '' ? null : editData.expiry_date,
-      };
-      await onEdit(ingredient.id, updates);
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error updating ingredient:', error);
-    } finally {
-      setIsSaving(false);
+    if (onEdit) {
+      onEdit(ingredient.id, {});
     }
-  };
-
-  const handleCancel = () => {
-    setIsEditing(false);
-    setEditData({
-      name: '',
-      quantity: 0,
-      unit: '',
-      category: '',
-      expiry_date: '',
-    });
   };
 
   const getExpiryStatus = () => {
@@ -219,7 +172,7 @@ export const IngredientDetailModal: React.FC<IngredientDetailModalProps> = ({
   const expiryStatus = getExpiryStatus();
 
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && !isEditing) {
+    if (e.target === e.currentTarget) {
       onClose();
     }
   };
@@ -238,15 +191,15 @@ export const IngredientDetailModal: React.FC<IngredientDetailModalProps> = ({
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">
-                {isEditing ? 'Edit Bahan' : ingredient.name}
+                {ingredient.name}
               </h2>
               <p className="text-sm text-gray-600">
-                {isEditing ? 'Ubah informasi bahan' : 'Detail informasi bahan'}
+                Detail informasi bahan
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {!isEditing && onEdit && (
+            {onEdit && (
               <button
                 onClick={handleEditClick}
                 className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -257,9 +210,8 @@ export const IngredientDetailModal: React.FC<IngredientDetailModalProps> = ({
               </button>
             )}
             <button
-              onClick={isEditing ? handleCancel : onClose}
+              onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              disabled={isSaving}
             >
               <X size={24} className="text-gray-500" />
             </button>
@@ -267,266 +219,152 @@ export const IngredientDetailModal: React.FC<IngredientDetailModalProps> = ({
         </div>
 
         <div className="p-6 space-y-6">
-          {isEditing ? (
-            /* Edit Form */
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nama Bahan
-                </label>
-                <input
-                  type="text"
-                  value={editData.name}
-                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="contoh: Ayam, Tomat, Beras..."
-                  required
-                  disabled={isSaving}
-                />
+          {/* Basic Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Quantity & Unit */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <Scale className="text-gray-600" size={20} />
+                <h3 className="font-semibold text-gray-900">Jumlah & Satuan</h3>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Jumlah
-                  </label>
-                  <input
-                    type="number"
-                    value={editData.quantity}
-                    onChange={(e) => setEditData({ ...editData, quantity: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    min="0.1"
-                    step="0.1"
-                    required
-                    disabled={isSaving}
-                  />
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Jumlah:</span>
+                  <span className="font-medium text-gray-900">{ingredient.quantity}</span>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Satuan
-                  </label>
-                  <select
-                    value={editData.unit}
-                    onChange={(e) => setEditData({ ...editData, unit: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    disabled={isSaving}
-                  >
-                    {units.map(unit => (
-                      <option key={unit} value={unit}>{unitTranslations[unit]}</option>
-                    ))}
-                  </select>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Satuan:</span>
+                  <span className="font-medium text-gray-900">
+                    {unitTranslations[ingredient.unit] || ingredient.unit}
+                  </span>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kategori
-                </label>
-                <select
-                  value={editData.category}
-                  onChange={(e) => setEditData({ ...editData, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  disabled={isSaving}
-                >
-                  {categories.map(category => (
-                    <option key={category} value={category}>{categoryTranslations[category]}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tanggal Kadaluarsa (opsional)
-                </label>
-                <input
-                  type="date"
-                  value={editData.expiry_date}
-                  onChange={(e) => setEditData({ ...editData, expiry_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  disabled={isSaving}
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving || !editData.name.trim()}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                >
-                  {isSaving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Menyimpan...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={16} />
-                      Simpan Perubahan
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={handleCancel}
-                  disabled={isSaving}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50"
-                >
-                  Batal
-                </button>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total:</span>
+                  <span className="font-bold text-lg text-orange-600">
+                    {ingredient.quantity} {unitTranslations[ingredient.unit] || ingredient.unit}
+                  </span>
+                </div>
               </div>
             </div>
-          ) : (
-            /* View Mode */
-            <>
-              {/* Basic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Quantity & Unit */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Scale className="text-gray-600" size={20} />
-                    <h3 className="font-semibold text-gray-900">Jumlah & Satuan</h3>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Jumlah:</span>
-                      <span className="font-medium text-gray-900">{ingredient.quantity}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Satuan:</span>
-                      <span className="font-medium text-gray-900">
-                        {unitTranslations[ingredient.unit] || ingredient.unit}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Total:</span>
-                      <span className="font-bold text-lg text-orange-600">
-                        {ingredient.quantity} {unitTranslations[ingredient.unit] || ingredient.unit}
-                      </span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Category */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Tag className="text-gray-600" size={20} />
-                    <h3 className="font-semibold text-gray-900">Kategori</h3>
+            {/* Category */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <Tag className="text-gray-600" size={20} />
+                <h3 className="font-semibold text-gray-900">Kategori</h3>
+              </div>
+              <div className={`inline-flex items-center px-3 py-2 rounded-lg border ${categoryColors[ingredient.category] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                <span className="font-medium">
+                  {categoryTranslations[ingredient.category] || ingredient.category}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Expiry Information */}
+          {ingredient.expiry_date && (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="text-gray-600" size={20} />
+                <h3 className="font-semibold text-gray-900">Informasi Kadaluarsa</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Tanggal kadaluarsa:</span>
+                  <span className="font-medium text-gray-900">
+                    {new Date(ingredient.expiry_date).toLocaleDateString('id-ID', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </span>
+                </div>
+                {expiryStatus && (
+                  <div className={`flex items-center gap-2 p-3 rounded-lg border ${expiryStatus.color}`}>
+                    {expiryStatus.icon}
+                    <span className="font-medium">{expiryStatus.message}</span>
                   </div>
-                  <div className={`inline-flex items-center px-3 py-2 rounded-lg border ${categoryColors[ingredient.category] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
-                    <span className="font-medium">
-                      {categoryTranslations[ingredient.category] || ingredient.category}
-                    </span>
-                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Usage Suggestions */}
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
+            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <CheckCircle className="text-green-600" size={20} />
+              Saran Penggunaan
+            </h3>
+            <ul className="space-y-2">
+              {getUsageSuggestions().slice(0, 3).map((suggestion, index) => (
+                <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-green-500 mt-1">•</span>
+                  <span>{suggestion}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Storage Tips */}
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
+            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Package className="text-blue-600" size={20} />
+              Tips Penyimpanan
+            </h3>
+            <ul className="space-y-2">
+              {getStorageTips().slice(0, 3).map((tip, index) => (
+                <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-blue-500 mt-1">•</span>
+                  <span>{tip}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Timestamps */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="font-semibold text-gray-900 mb-3">Informasi Tambahan</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Ditambahkan:</span>
+                <div className="font-medium text-gray-900">
+                  {new Date(ingredient.created_at || '').toLocaleDateString('id-ID', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
                 </div>
               </div>
-
-              {/* Expiry Information */}
-              {ingredient.expiry_date && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Calendar className="text-gray-600" size={20} />
-                    <h3 className="font-semibold text-gray-900">Informasi Kadaluarsa</h3>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Tanggal kadaluarsa:</span>
-                      <span className="font-medium text-gray-900">
-                        {new Date(ingredient.expiry_date).toLocaleDateString('id-ID', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </span>
-                    </div>
-                    {expiryStatus && (
-                      <div className={`flex items-center gap-2 p-3 rounded-lg border ${expiryStatus.color}`}>
-                        {expiryStatus.icon}
-                        <span className="font-medium">{expiryStatus.message}</span>
-                      </div>
-                    )}
+              {ingredient.updated_at && ingredient.updated_at !== ingredient.created_at && (
+                <div>
+                  <span className="text-gray-600">Terakhir diubah:</span>
+                  <div className="font-medium text-gray-900">
+                    {new Date(ingredient.updated_at).toLocaleDateString('id-ID', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
                   </div>
                 </div>
               )}
-
-              {/* Usage Suggestions */}
-              <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <CheckCircle className="text-green-600" size={20} />
-                  Saran Penggunaan
-                </h3>
-                <ul className="space-y-2">
-                  {getUsageSuggestions().slice(0, 3).map((suggestion, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
-                      <span className="text-green-500 mt-1">•</span>
-                      <span>{suggestion}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Storage Tips */}
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Package className="text-blue-600" size={20} />
-                  Tips Penyimpanan
-                </h3>
-                <ul className="space-y-2">
-                  {getStorageTips().slice(0, 3).map((tip, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
-                      <span className="text-blue-500 mt-1">•</span>
-                      <span>{tip}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Timestamps */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-gray-900 mb-3">Informasi Tambahan</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Ditambahkan:</span>
-                    <div className="font-medium text-gray-900">
-                      {new Date(ingredient.created_at || '').toLocaleDateString('id-ID', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </div>
-                  </div>
-                  {ingredient.updated_at && ingredient.updated_at !== ingredient.created_at && (
-                    <div>
-                      <span className="text-gray-600">Terakhir diubah:</span>
-                      <div className="font-medium text-gray-900">
-                        {new Date(ingredient.updated_at).toLocaleDateString('id-ID', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
-        {!isEditing && (
-          <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-lg">
-            <button
-              onClick={onClose}
-              className="w-full bg-orange-500 text-white py-3 px-4 rounded-lg hover:bg-orange-600 transition-colors font-medium"
-            >
-              Tutup Detail
-            </button>
-          </div>
-        )}
+        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="w-full bg-orange-500 text-white py-3 px-4 rounded-lg hover:bg-orange-600 transition-colors font-medium"
+          >
+            Tutup Detail
+          </button>
+        </div>
       </div>
     </div>
   );
