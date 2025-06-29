@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, Edit, Clock, Users, ChefHat, Search, X } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { Plus, Trash2, Edit, Clock, Users, ChefHat, Search, X, Loader2 } from 'lucide-react';
 import { useRecipes } from '../hooks/useRecipes';
 import { useAuth } from '../hooks/useAuth';
 import { RecipeDetailModal } from './RecipeDetailModal';
@@ -8,7 +8,18 @@ import { Recipe } from '../types';
 
 export const RecipeManager: React.FC = () => {
   const { user } = useAuth();
-  const { recipes, loading, error, addRecipe, updateRecipe, deleteRecipe } = useRecipes(user?.id);
+  const { 
+    recipes, 
+    loading, 
+    loadingMore, 
+    error, 
+    hasMore, 
+    addRecipe, 
+    updateRecipe, 
+    deleteRecipe, 
+    loadMore 
+  } = useRecipes(user?.id);
+  
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
@@ -36,6 +47,10 @@ export const RecipeManager: React.FC = () => {
     difficulty: 'easy' as const,
     tags: [] as string[],
   });
+
+  // Infinite scroll setup
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const difficultyTranslations = {
     easy: 'Mudah',
@@ -110,6 +125,32 @@ export const RecipeManager: React.FC = () => {
 
     return matchedRecipes;
   }, [recipes, searchQuery]);
+
+  // Set up intersection observer for infinite scroll
+  const lastRecipeElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (loading || loadingMore) return;
+    if (observerRef.current) observerRef.current.disconnect();
+    
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore && !searchQuery) {
+        loadMore();
+      }
+    }, {
+      threshold: 0.1,
+      rootMargin: '100px'
+    });
+    
+    if (node) observerRef.current.observe(node);
+  }, [loading, loadingMore, hasMore, loadMore, searchQuery]);
+
+  // Clean up observer on unmount
+  useEffect(() => {
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -547,72 +588,103 @@ export const RecipeManager: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredRecipes.map((recipe) => (
-            <div
-              key={recipe.id}
-              className="bg-white rounded-lg shadow-md border border-green-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => handleCardClick(recipe)}
-            >
-              <div className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className="font-semibold text-gray-900 text-lg">{recipe.name}</h3>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdit(recipe);
-                      }}
-                      className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                      title="Edit resep"
-                    >
-                      <Edit size={14} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteClick(recipe);
-                      }}
-                      className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                      title="Hapus resep"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredRecipes.map((recipe, index) => (
+              <div
+                key={recipe.id}
+                ref={index === filteredRecipes.length - 1 && !searchQuery ? lastRecipeElementRef : null}
+                className="bg-white rounded-lg shadow-md border border-green-100 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => handleCardClick(recipe)}
+              >
+                <div className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className="font-semibold text-gray-900 text-lg">{recipe.name}</h3>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(recipe);
+                        }}
+                        className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                        title="Edit resep"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(recipe);
+                        }}
+                        className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+                        title="Hapus resep"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                
-                <p className="text-sm text-gray-600 mb-3">{recipe.description}</p>
-                
-                <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                  <div className="flex items-center gap-1">
-                    <Clock size={14} />
-                    <span>{recipe.prep_time + recipe.cook_time} menit</span>
+                  
+                  <p className="text-sm text-gray-600 mb-3">{recipe.description}</p>
+                  
+                  <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
+                    <div className="flex items-center gap-1">
+                      <Clock size={14} />
+                      <span>{recipe.prep_time + recipe.cook_time} menit</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users size={14} />
+                      <span>{recipe.servings} porsi</span>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      recipe.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
+                      recipe.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {difficultyTranslations[recipe.difficulty]}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Users size={14} />
-                    <span>{recipe.servings} porsi</span>
+                  
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">Bahan: </span>
+                    {recipe.recipe_ingredients.length} item
                   </div>
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    recipe.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
-                    recipe.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {difficultyTranslations[recipe.difficulty]}
-                  </span>
-                </div>
-                
-                <div className="text-sm text-gray-600">
-                  <span className="font-medium">Bahan: </span>
-                  {recipe.recipe_ingredients.length} item
-                </div>
 
-                {/* Click hint */}
-                <div className="mt-3 text-xs text-gray-400 text-center">
-                  Klik untuk melihat detail lengkap
+                  {/* Click hint */}
+                  <div className="mt-3 text-xs text-gray-400 text-center">
+                    Klik untuk melihat detail lengkap
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
+
+          {/* Loading More Indicator */}
+          {loadingMore && (
+            <div className="flex justify-center items-center py-8">
+              <div className="flex items-center gap-2 text-gray-600">
+                <Loader2 className="animate-spin" size={20} />
+                <span>Memuat resep lainnya...</span>
+              </div>
             </div>
-          ))}
+          )}
+
+          {/* End of Results Indicator */}
+          {!hasMore && !searchQuery && recipes.length > 8 && (
+            <div className="text-center py-8">
+              <div className="text-gray-500 text-sm">
+                🎉 Anda telah melihat semua {recipes.length} resep
+              </div>
+            </div>
+          )}
+
+          {/* Search Results Count */}
+          {searchQuery && (
+            <div className="text-center py-4">
+              <div className="text-gray-500 text-sm">
+                Menampilkan {filteredRecipes.length} dari {recipes.length} resep
+              </div>
+            </div>
+          )}
         </div>
       )}
 
