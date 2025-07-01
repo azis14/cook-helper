@@ -1,10 +1,35 @@
 import React from 'react';
-import { Heart, Coffee, ExternalLink, Mail, Zap } from 'lucide-react';
+import { Heart, Coffee, ExternalLink, Mail, Zap, Trophy } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
     <footer className="bg-gradient-to-r from-orange-100 to-yellow-100 border-t border-orange-200 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Devpost Competition Support Banner */}
+        <div className="mb-8 p-6 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg shadow-lg">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-white">
+              <Trophy size={32} className="text-yellow-300" />
+              <div>
+                <h3 className="text-lg font-bold">🏆 Support Cook Helper on Devpost!</h3>
+                <p className="text-purple-100 text-sm">
+                  Help us win the competition by checking out our submission and showing your support!
+                </p>
+              </div>
+            </div>
+            <a
+              href="https://devpost.com/software/cook-assistant?ref_content=user-portfolio&ref_feature=in_progress"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-purple-600 font-bold text-sm rounded-lg hover:bg-purple-50 transform hover:scale-105 transition-all duration-200 shadow-md hover:shadow-lg group"
+            >
+              <Trophy size={20} className="group-hover:animate-bounce" />
+              View on Devpost
+              <ExternalLink size={16} className="group-hover:translate-x-0.5 transition-transform" />
+            </a>
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Copyright Section - Stacked vertically */}
           <div className="flex flex-col items-center gap-2 text-gray-700">
